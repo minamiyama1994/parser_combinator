@@ -1,0 +1,2 @@
+#! /bin/sh
+cp .listup Makefile /C/Users/Owner/Documents/GitHub/parser_combinator/
