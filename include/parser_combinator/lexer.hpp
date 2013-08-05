@@ -19,7 +19,6 @@ namespace parser_combinator
 			using regex_id_filter_predicate_type = bx::regex_id_filter_predicate < iterator_type > ;
 			using string_type = std::basic_string < typename std::iterator_traits < iterator_type >::value_type > ;
 			using action_type = std::function < void ( const string_type & ) > ;
-			using regex_id_type = decltype ( regex_type { }.regex_id ( ) ) ;
 			iterator_type begin_ ;
 			iterator_type end_ ;
 			regex_type regex_ ;
@@ -57,15 +56,15 @@ namespace parser_combinator
 		template < typename expression_type >
 		auto lexer < iterator_type >::operator ( ) ( const expression_type & expr , const action_type & action ) -> void
 		{
-			regex_type new_regex { bx::bos >> expr } ;
+			regex_type new_regex { ( bx::bos >> expr ) [ bx::ref ( action ) ( bx::as < string_type > ( bx::_ ) ) ] } ;
 			if ( ! regex_.regex_id ( ) )
 			{
-				regex_ = new_regex [ bx::ref ( action ) ( bx::as < string_type > ( bx::_ ) ) ] ;
+				regex_ = new_regex ;
 			}
 			else
 			{
-				regex_type tmp_regex { regex_ | new_regex [ bx::ref ( action ) ( bx::as < string_type > ( bx::_ ) ) ] } ;
-				regex_ = tmp_regex ;
+				regex_type tmp_regex { regex_ } ;
+				regex_ = tmp_regex | new_regex ;
 			}
 		}
 		template < typename iterator_type >
@@ -73,9 +72,12 @@ namespace parser_combinator
 		try
 		{
 			regex_type new_regex { bx::bos >> bx::_ } ;
-			auto action = [ & ] ( const string_type & ) { std::cout << "Error." << std::endl ; } ;
-			regex_type tmp_regex { regex_ | new_regex [ bx::ref ( action ) ( bx::as < string_type > ( bx::_ ) ) ] } ;
-			regex_ = tmp_regex ;
+			auto action = [ & ] ( const string_type & str )
+			{
+				std::cout << "Error : " << str << std::endl ;
+			} ;
+			regex_type tmp_regex { regex_ } ;
+			regex_ = tmp_regex | new_regex [ bx::ref ( action ) ( bx::as < string_type > ( bx::_ ) ) ] ;
 			match_results_type result ;
 			for ( ; bx::regex_search ( begin_ , end_ , result , regex_ ) && ( begin_ != end_ ) ; begin_ = result [ 0 ].second )
 			{
