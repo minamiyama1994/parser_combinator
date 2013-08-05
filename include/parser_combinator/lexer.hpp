@@ -97,4 +97,42 @@ namespace parser_combinator
 		}
 	}
 }
+/*
+// main.cpp
+#include"parser_combinator/lexer.hpp"
+auto main ( ) -> int
+{
+	std::string input { std::istreambuf_iterator < char > { std::cin } , std::istreambuf_iterator < char > { } } ;
+	auto lexer = parser_combinator::lexer::make_lexer ( input.begin ( ) , input.end ( ) ) ;
+	lexer ( "instance" , [ & ] ( const std::string & str )
+	{
+		std::cout << str << std::endl ;
+	} ) ;
+	lexer ( + boost::xpressive::range ( '0' , '9' ) , [ & ] ( const std::string & str )
+	{
+		std::cout << "number : " << str << std::endl ;
+	} ) ;
+	lexer ( + ( boost::xpressive::range ( 'a' , 'z' ) | boost::xpressive::range ( 'A' , 'Z' ) ) , [ & ] ( const std::string & str )
+	{
+		std::cout << "word : " << str << std::endl ;
+	} ) ;
+	lexer ( + ( boost::xpressive::set = ' ' , '\t' , '\r' , '\n' ) , [ & ] ( const std::string & )
+	{
+		std::cout << "space" << std::endl ;
+	} ) ;
+	lexer ( ) ;
+}
+
+//input
+instanceof
+instance
+
+//output
+instance
+word : of
+space
+instance
+space
+
+*/
 #endif
