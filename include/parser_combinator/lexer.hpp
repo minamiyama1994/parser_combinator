@@ -10,12 +10,13 @@ namespace parser_combinator
 {
 	namespace lexer
 	{
+		namespace bx = boost::xpressive ;
 		template < typename iterator_type >
 		class lexer
 		{
-			using regex_type = boost::xpressive::basic_regex < iterator_type > ;
-			using match_results_type = boost::xpressive::match_results < iterator_type > ;
-			using regex_id_filter_predicate_type = boost::xpressive::regex_id_filter_predicate < iterator_type > ;
+			using regex_type = bx::basic_regex < iterator_type > ;
+			using match_results_type = bx::match_results < iterator_type > ;
+			using regex_id_filter_predicate_type = bx::regex_id_filter_predicate < iterator_type > ;
 			using string_type = std::basic_string < typename std::iterator_traits < iterator_type >::value_type > ;
 			using action_type = std::function < void ( const string_type & ) > ;
 			using regex_id_type = decltype ( regex_type { }.regex_id ( ) ) ;
@@ -30,7 +31,10 @@ namespace parser_combinator
 			auto operator = ( lexer && ) -> lexer & = default ;
 			~ lexer ( ) = default ;
 			lexer ( iterator_type begin , iterator_type end ) ;
-			auto operator ( ) ( const regex_type & regex , const action_type & action ) -> void ;
+			auto operator ( ) ( const string_type & string , const action_type & action ) -> void ;
+			auto operator ( ) ( const typename string_type::value_type * const string , const action_type & action ) -> void ;
+			template < typename expression_type >
+			auto operator ( ) ( const expression_type & expr , const action_type & action ) -> void ;
 			auto operator ( ) ( ) -> void ;
 		} ;
 		template < typename iterator_type >
@@ -40,16 +44,27 @@ namespace parser_combinator
 		{
 		}
 		template < typename iterator_type >
-		auto lexer < iterator_type >::operator ( ) ( const regex_type & regex , const action_type & action ) -> void
+		auto lexer < iterator_type >::operator ( ) ( const string_type & string , const action_type & action ) -> void
 		{
-			regex_type new_regex { boost::xpressive::bos >> regex } ;
+			( * this ) ( bx::as_xpr ( string ) , action ) ;
+		}
+		template < typename iterator_type >
+		auto lexer < iterator_type >::operator ( ) ( const typename string_type::value_type * const string , const action_type & action ) -> void
+		{
+			( * this ) ( string_type { string } , action ) ;
+		}
+		template < typename iterator_type >
+		template < typename expression_type >
+		auto lexer < iterator_type >::operator ( ) ( const expression_type & expr , const action_type & action ) -> void
+		{
+			regex_type new_regex { bx::bos >> expr } ;
 			if ( ! regex_.regex_id ( ) )
 			{
-				regex_ = new_regex [ boost::xpressive::ref ( action ) ( boost::xpressive::as < string_type > ( boost::xpressive::_ ) ) ] ;
+				regex_ = new_regex [ bx::ref ( action ) ( bx::as < string_type > ( bx::_ ) ) ] ;
 			}
 			else
 			{
-				regex_type tmp_regex { regex_ | new_regex [ boost::xpressive::ref ( action ) ( boost::xpressive::as < string_type > ( boost::xpressive::_ ) ) ] } ;
+				regex_type tmp_regex { regex_ | new_regex [ bx::ref ( action ) ( bx::as < string_type > ( bx::_ ) ) ] } ;
 				regex_ = tmp_regex ;
 			}
 		}
@@ -57,14 +72,13 @@ namespace parser_combinator
 		auto lexer < iterator_type >::operator ( ) ( ) -> void
 		try
 		{
-			regex_type new_regex { boost::xpressive::bos >> boost::xpressive::_ } ;
-			action_type action { [ & ] ( const string_type & ) { std::cout << "Error." << std::endl ; } } ;
-			regex_type tmp_regex { regex_ | new_regex [ boost::xpressive::ref ( action ) ( boost::xpressive::as < string_type > ( boost::xpressive::_ ) ) ] } ;
+			regex_type new_regex { bx::bos >> bx::_ } ;
+			auto action = [ & ] ( const string_type & ) { std::cout << "Error." << std::endl ; } ;
+			regex_type tmp_regex { regex_ | new_regex [ bx::ref ( action ) ( bx::as < string_type > ( bx::_ ) ) ] } ;
 			regex_ = tmp_regex ;
 			match_results_type result ;
-			for ( ; boost::xpressive::regex_search ( begin_ , end_ , result , regex_ ) && ( begin_ != end_ ) ; )
+			for ( ; bx::regex_search ( begin_ , end_ , result , regex_ ) && ( begin_ != end_ ) ; begin_ = result [ 0 ].second )
 			{
-				begin_ = result [ 0 ].second ;
 			}
 			if ( begin_ != end_ )
 			{
