@@ -21,7 +21,7 @@ namespace parser_combinator
 			using action_type = std::function < void ( const string_type & ) > ;
 			iterator_type begin_ ;
 			iterator_type end_ ;
-			std::vector < regex_type > regex_list_ ;
+			regex_type regex_ ;
 		public :
 			lexer ( ) = delete ;
 			lexer ( const lexer & ) = delete ;
@@ -29,61 +29,39 @@ namespace parser_combinator
 			auto operator = ( const lexer & ) -> lexer & = delete ;
 			auto operator = ( lexer && ) -> lexer & = default ;
 			~ lexer ( ) = default ;
-			lexer ( iterator_type begin , iterator_type end ) ;
-			auto operator ( ) ( const string_type & string , const action_type & action ) -> void ;
-			auto operator ( ) ( const typename string_type::value_type * const string , const action_type & action ) -> void ;
-			template < typename expression_type >
-			auto operator ( ) ( const expression_type & expr , const action_type & action ) -> void ;
+			template < typename ... args_type >
+			lexer ( iterator_type begin , iterator_type end , const args_type & ... args ) ;
 			auto operator ( ) ( ) -> void ;
 		} ;
-		template < typename iterator_type >
-		auto make_regex  ( iterator_type begin , iterator_type end ) -> bx::basic_regex < typename std::iterator_traits < iterator_type >::value_type::iterator_type >
+		template < typename iterator_type , typename regex_expression_type >
+		auto make_regex_helper ( const regex_expression_type & expression ) -> bx::basic_regex < iterator_type >
 		{
-			if ( begin == end )
-			{
-				using string_type = std::basic_string < typename std::iterator_traits < typename std::iterator_traits < iterator_type >::value_type::iterator_type >::value_type > ;
-				auto action = [ & ] ( const string_type & str )
-				{
-					std::cout << "Error : " << str << std::endl ;
-				} ;
-				return bx::_ [ bx::ref ( action ) ( bx::as < string_type > ( bx::_ ) ) ] ;
-			}
-			else
-			{
-				auto tmp_begin = begin ;
-				++ tmp_begin ;
-				return ( * begin ) | make_regex ( tmp_begin , end ) ;
-			}
+			return expression | ( bx::bos >> bx::_ ) ;
+		}
+		template < typename iterator_type , typename regex_expression_type , typename regex_type , typename action_type , typename ... args_type >
+		auto make_regex_helper ( const regex_expression_type & expression , const regex_type & regex , const action_type & action , const args_type & ... args ) -> bx::basic_regex < iterator_type >
+		{
+			return make_regex_helper < iterator_type >  ( expression | ( bx::bos >> regex ) [ bx::ref ( action ) ( bx::_ ) ] , args ... ) ;
+		}
+		template < typename iterator_type , typename regex_type , typename action_type , typename ... args_type >
+		auto make_regex ( const regex_type & regex , const action_type & action , const args_type & ... args ) -> bx::basic_regex < iterator_type >
+		{
+			return make_regex_helper < iterator_type > ( ( bx::bos >> regex ) [ bx::ref ( action ) ( bx::_ ) ] , args ... ) ;
 		}
 		template < typename iterator_type >
-		lexer < iterator_type >::lexer ( iterator_type begin , iterator_type end )
+		template < typename ... args_type >
+		lexer < iterator_type >::lexer ( iterator_type begin , iterator_type end , const args_type & ... args )
 			: begin_ { begin }
 			, end_ { end }
+			, regex_ ( make_regex < iterator_type > ( args ... ) )
 		{
-		}
-		template < typename iterator_type >
-		auto lexer < iterator_type >::operator ( ) ( const string_type & string , const action_type & action ) -> void
-		{
-			( * this ) ( bx::as_xpr ( string ) , action ) ;
-		}
-		template < typename iterator_type >
-		auto lexer < iterator_type >::operator ( ) ( const typename string_type::value_type * const string , const action_type & action ) -> void
-		{
-			( * this ) ( string_type { string } , action ) ;
-		}
-		template < typename iterator_type >
-		template < typename expression_type >
-		auto lexer < iterator_type >::operator ( ) ( const expression_type & expr , const action_type & action ) -> void
-		{
-			regex_list_.push_back ( ( bx::bos >> expr ) [ bx::ref ( action ) ( bx::as < string_type > ( bx::_ ) ) ] ) ;
 		}
 		template < typename iterator_type >
 		auto lexer < iterator_type >::operator ( ) ( ) -> void
 		try
 		{
-			auto regex = make_regex ( regex_list_.cbegin ( ) , regex_list_.cend ( ) ) ;
 			match_results_type result ;
-			for ( ; bx::regex_search ( begin_ , end_ , result , regex ) && ( begin_ != end_ ) ; begin_ = result [ 0 ].second )
+			for ( ; bx::regex_search ( begin_ , end_ , result , regex_ ) && ( begin_ != end_ ) ; begin_ = result [ 0 ].second )
 			{
 			}
 			if ( begin_ != end_ )
@@ -96,49 +74,11 @@ namespace parser_combinator
 			begin_ = end_ ;
 			throw ;
 		}
-		template < typename iterator_type >
-		auto make_lexer ( iterator_type begin , iterator_type end ) -> lexer < iterator_type >
+		template < typename iterator_type , typename ... args_type >
+		auto make_lexer ( iterator_type begin , iterator_type end , const args_type & ... args ) -> lexer < iterator_type >
 		{
-			return lexer < iterator_type > { begin , end } ;
+			return lexer < iterator_type > { begin , end , args ... } ;
 		}
 	}
 }
-/*
-// main.cpp
-#include"parser_combinator/lexer.hpp"
-auto main ( ) -> int
-{
-	std::string input { std::istreambuf_iterator < char > { std::cin } , std::istreambuf_iterator < char > { } } ;
-	auto lexer = parser_combinator::lexer::make_lexer ( input.begin ( ) , input.end ( ) ) ;
-	lexer ( "instance" , [ & ] ( const std::string & str )
-	{
-		std::cout << str << std::endl ;
-	} ) ;
-	lexer ( + boost::xpressive::range ( '0' , '9' ) , [ & ] ( const std::string & str )
-	{
-		std::cout << "number : " << str << std::endl ;
-	} ) ;
-	lexer ( + ( boost::xpressive::range ( 'a' , 'z' ) | boost::xpressive::range ( 'A' , 'Z' ) ) , [ & ] ( const std::string & str )
-	{
-		std::cout << "word : " << str << std::endl ;
-	} ) ;
-	lexer ( + ( boost::xpressive::set = ' ' , '\t' , '\r' , '\n' ) , [ & ] ( const std::string & )
-	{
-		std::cout << "space" << std::endl ;
-	} ) ;
-	lexer ( ) ;
-}
-
-//input
-instanceof
-instance
-
-//output
-instance
-word : of
-space
-instance
-space
-
-*/
 #endif
