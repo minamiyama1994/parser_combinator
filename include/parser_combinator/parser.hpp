@@ -1,7 +1,6 @@
 #ifndef PARSER_COMBINATOR_PARSER_HPP
 #define PARSER_COMBINATOR_PARSER_HPP
-#include"boost/mpl/vector.hpp"
-#include"boost/mpl/push_back.hpp"
+#include"boost/mpl/int.hpp"
 namespace parser_combinator
 {
 	namespace parser
@@ -41,22 +40,40 @@ namespace parser_combinator
 			auto operator = ( terminal && ) -> terminal & = default ;
 			~ terminal ( ) = default ;
 		} ;
-		template < typename type_tuple , typename ... args_type >
+		template < typename first_type , typename second_type >
+		class first_only_tuple
+			: public std::tuple < first_type , second_type >
+		{
+		public :
+			first_only_tuple ( ) = default ;
+			first_only_tuple ( const first_only_tuple & ) = default ;
+			first_only_tuple ( first_only_tuple && ) = default ;
+			auto operator = ( const first_only_tuple & ) -> first_only_tuple & = default ;
+			auto operator = ( first_only_tuple && ) -> first_only_tuple & = default ;
+			~ first_only_tuple ( ) = default ;
+			first_only_tuple ( const first_type & first ) ;
+		} ;
+		template < typename first_type , typename second_type >
+		first_only_tuple < first_type , second_type >::first_only_tuple ( const first_type & first )
+			: std::tuple < first_type , second_type > { first , second_type { } }
+		{
+		}
+		template < int index , typename type_tuple , typename ... args_type >
 		struct make_rules ;
-		template < typename ... type_in_tuple >
-		struct make_rules < std::tuple < type_in_tuple ... > >
+		template < int index , typename ... type_in_tuple >
+		struct make_rules < index , std::tuple < type_in_tuple ... > >
 		{
 			using type = std::tuple < type_in_tuple ... > ;
 		} ;
-		template < typename ... type_in_tuple , typename args_head , typename ... args_type >
-		struct make_rules < std::tuple < type_in_tuple ... > , args_head , args_type ... >
-			: make_rules < std::tuple < type_in_tuple ... , args_head > , args_type ... >
+		template < int index , typename ... type_in_tuple , typename args_head , typename ... args_type >
+		struct make_rules < index , std::tuple < type_in_tuple ... > , args_head , args_type ... >
+			: make_rules < index + 1 , std::tuple < type_in_tuple ... , first_only_tuple < args_head , mpl::int_ < index > > > , args_type ... >
 		{
 		} ;
 		template < typename ... rules_type >
 		class parser
 		{
-			using rules_type_ = typename make_rules < std::tuple < > , rules_type ... >::type ;
+			using rules_type_ = typename make_rules < 0 , std::tuple < > , rules_type ... >::type ;
 			rules_type_ rules_ ;
 		public :
 			parser ( ) = delete ;
