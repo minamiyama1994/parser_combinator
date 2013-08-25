@@ -1,6 +1,11 @@
 #ifndef PARSER_COMBINATOR_PARSER_HPP
 #define PARSER_COMBINATOR_PARSER_HPP
 #include"boost/mpl/int.hpp"
+#include"boost/mpl/vector.hpp"
+#include"boost/mpl/equal.hpp"
+#include"boost/mpl/transform.hpp"
+#include"boost/mpl/front_inserter.hpp"
+#include"boost/mpl/print.hpp"
 namespace parser_combinator
 {
 	namespace parser
@@ -70,11 +75,106 @@ namespace parser_combinator
 			: make_rules < index + 1 , std::tuple < type_in_tuple ... , first_only_tuple < args_head , mpl::int_ < index > > > , args_type ... >
 		{
 		} ;
+		template < typename T1 >
+		struct make_first_only_tuple
+		{
+			template < typename T2 >
+			struct apply
+			{
+				using type = first_only_tuple < T2 , T1 > ;
+			} ;
+		} ;
+		template < typename T >
+		struct shift_to_vector ;
+		template < typename T , typename id_type , id_type id >
+		struct shift_to_vector < rule < T , id_type , id > >
+		{
+			using type = mpl::vector < rule < T , id_type , id > > ;
+		} ;
+		template < typename T , typename id_type , id_type id >
+		struct shift_to_vector < terminal < T , id_type , id > >
+		{
+			using type = mpl::vector < rule < T , id_type , id > > ;
+		} ;
+		template < typename lhs_type , typename rhs_type >
+		struct shift_to_vector < shift_result < lhs_type , rhs_type > >
+			: mpl::push_back < typename shift_to_vector < lhs_type >::type , rhs_type >
+		{
+		} ;
+		struct current_read
+		{
+		} ;
+		template < typename T1 , typename T2 , typename T3 , typename T4 >
+		struct vector_to_LR0
+			: vector_to_LR0
+			<
+				typename mpl::push_back
+				<
+					T1 ,
+					typename mpl::insert < T2 , T3 , current_read >::type
+				>::type ,
+				T2 ,
+				typename mpl::next < T3 >::type ,
+				T4
+			>::type
+		{
+		} ;
+		template < typename T1 , typename T2 , typename T3 >
+		struct vector_to_LR0 < T1 , T2 , T3 , T3 >
+			: mpl::push_back
+			<
+				T1 ,
+				typename mpl::push_back < T2 , current_read >::type
+			>
+		{
+		} ;
+		template < typename T >
+		struct assign_to_vector ;
+		template < typename lhs_type , typename rhs_type >
+		struct assign_to_vector < assign_result < lhs_type , rhs_type > >
+		{
+			using seq_type = typename shift_to_vector < rhs_type >::type ;
+			using type = typename mpl::transform
+			<
+				typename vector_to_LR0
+				<
+					mpl::vector < > ,
+					seq_type ,
+					typename mpl::begin < seq_type >::type ,
+					typename mpl::end < seq_type >::type
+				>::type ,
+				mpl::push_front < mpl::_ , lhs_type >
+			>::type ;
+		} ;
+		template < typename T >
+		struct make_LR0 ;
+		template < >
+		struct make_LR0 < std::tuple < > >
+		{
+			using type = mpl::vector < > ;
+		} ;
+		template < typename lhs_type , typename rhs_type >
+		struct make_LR0 < assign_result < lhs_type , rhs_type > >
+		{
+			using type = typename assign_to_vector < assign_result < lhs_type , rhs_type > >::type ;
+		} ;
+		template < typename T1 , typename T2 >
+		struct make_LR0 < first_only_tuple < T1 , T2 > >
+			: mpl::transform < typename make_LR0 < T1 >::type , make_first_only_tuple < T2 > >
+		{
+		} ;
+		template < typename T1 , typename ... T_ >
+		struct make_LR0 < std::tuple < T1 , T_ ... > >
+			: mpl::copy < typename make_LR0 < T1 >::type , mpl::back_inserter < typename make_LR0 < std::tuple < T_ ... > >::type > >
+		{
+		} ;
 		template < typename ... rules_type >
 		class parser
 		{
 			using rules_type_ = typename make_rules < 0 , std::tuple < > , rules_type ... >::type ;
+			using type = typename make_LR0 < rules_type_ >::type ;
 			rules_type_ rules_ ;
+			// typename mpl::print < type >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
