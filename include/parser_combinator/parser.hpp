@@ -20,6 +20,20 @@ namespace parser_combinator
 		template < typename rule_type >
 		struct get_value_type ;
 		template < typename T , typename id_type , id_type id >
+		struct top_rule
+		{
+			using type = top_rule ;
+			static constexpr id_type value = id ;
+			top_rule ( ) = default ;
+			top_rule ( const top_rule & ) = default ;
+			top_rule ( top_rule && ) = default ;
+			auto operator = ( const top_rule & ) -> top_rule & = default ;
+			auto operator = ( top_rule && ) -> top_rule & = default ;
+			~ top_rule ( ) = default ;
+			template < typename rhs_type >
+			auto operator = ( const rhs_type & ) -> assign_result < top_rule , typename rhs_type::type > ;
+		} ;
+		template < typename T , typename id_type , id_type id >
 		struct rule
 		{
 			using type = rule ;
@@ -76,16 +90,21 @@ namespace parser_combinator
 		{
 		} ;
 		template < typename T1 >
-		struct make_first_only_tuple
+		struct make_pair
 		{
 			template < typename T2 >
 			struct apply
 			{
-				using type = first_only_tuple < T2 , T1 > ;
+				using type = mpl::pair < T2 , T1 > ;
 			} ;
 		} ;
 		template < typename T >
 		struct shift_to_vector ;
+		template < typename T , typename id_type , id_type id >
+		struct shift_to_vector < top_rule < T , id_type , id > >
+		{
+			using type = mpl::vector < top_rule < T , id_type , id > > ;
+		} ;
 		template < typename T , typename id_type , id_type id >
 		struct shift_to_vector < rule < T , id_type , id > >
 		{
@@ -94,7 +113,7 @@ namespace parser_combinator
 		template < typename T , typename id_type , id_type id >
 		struct shift_to_vector < terminal < T , id_type , id > >
 		{
-			using type = mpl::vector < rule < T , id_type , id > > ;
+			using type = mpl::vector < terminal < T , id_type , id > > ;
 		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct shift_to_vector < shift_result < lhs_type , rhs_type > >
@@ -106,25 +125,25 @@ namespace parser_combinator
 		} ;
 		template < typename T1 , typename T2 , typename T3 , typename T4 >
 		struct vector_to_LR0
-			: vector_to_LR0
+			: mpl::eval_if
 			<
-				typename mpl::push_back
+				std::is_same < T3 , T4 > ,
+				mpl::push_back
 				<
 					T1 ,
-					typename mpl::insert < T2 , T3 , current_read >::type
-				>::type ,
-				T2 ,
-				typename mpl::next < T3 >::type ,
-				T4
-			>::type
-		{
-		} ;
-		template < typename T1 , typename T2 , typename T3 >
-		struct vector_to_LR0 < T1 , T2 , T3 , T3 >
-			: mpl::push_back
-			<
-				T1 ,
-				typename mpl::push_back < T2 , current_read >::type
+					typename mpl::push_back < T2 , current_read >::type
+				> ,
+				vector_to_LR0
+				<
+					typename mpl::push_back
+					<
+						T1 ,
+						typename mpl::insert < T2 , T3 , current_read >::type
+					>::type ,
+					T2 ,
+					typename mpl::next < T3 >::type ,
+					T4
+				>
 			>
 		{
 		} ;
@@ -155,12 +174,12 @@ namespace parser_combinator
 		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct make_LR0 < assign_result < lhs_type , rhs_type > >
+			: assign_to_vector < assign_result < lhs_type , rhs_type > >
 		{
-			using type = typename assign_to_vector < assign_result < lhs_type , rhs_type > >::type ;
 		} ;
 		template < typename T1 , typename T2 >
 		struct make_LR0 < first_only_tuple < T1 , T2 > >
-			: mpl::transform < typename make_LR0 < T1 >::type , make_first_only_tuple < T2 > >
+			: mpl::transform < typename make_LR0 < T1 >::type , make_pair < T2 > >
 		{
 		} ;
 		template < typename T1 , typename ... T_ >
@@ -197,6 +216,11 @@ namespace parser_combinator
 		{
 		} ;
 		template < typename T , typename id_type , id_type id >
+		struct get_value_type < top_rule < T , id_type , id > >
+		{
+			using type = T ;
+		} ;
+		template < typename T , typename id_type , id_type id >
 		struct get_value_type < rule < T , id_type , id > >
 		{
 			using type = T ;
@@ -208,6 +232,12 @@ namespace parser_combinator
 		} ;
 		template < typename lhs_type , typename rhs_lhs_type , typename rhs_rhs_type >
 		struct assign_result < lhs_type , assign_result < rhs_lhs_type , rhs_rhs_type > > ;
+		template < typename T , typename id_type , id_type id , typename rhs_type >
+		struct assign_result < top_rule < T , id_type , id > , rhs_type >
+		{
+			using type = assign_result ;
+			typename assign_to_function < rhs_type , T >::type value { } ;
+		} ;
 		template < typename T , typename id_type , id_type id , typename rhs_type >
 		struct assign_result < rule < T , id_type , id > , rhs_type >
 		{
@@ -235,6 +265,12 @@ namespace parser_combinator
 		{
 			return typename shift_result < typename lhs_type::type , typename rhs_type::type >::type { } ;
 		}
+		template < typename T , typename id_type , id_type id >
+		template < typename rhs_type >
+		auto top_rule < T , id_type , id >::operator = ( const rhs_type & ) -> assign_result < top_rule , typename rhs_type::type >
+		{
+			return assign_result < top_rule , typename rhs_type::type > { } ;
+		} ;
 		template < typename T , typename id_type , id_type id >
 		template < typename rhs_type >
 		auto rule < T , id_type , id >::operator = ( const rhs_type & ) -> assign_result < rule , typename rhs_type::type >
