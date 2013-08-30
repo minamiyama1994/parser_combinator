@@ -3,6 +3,8 @@
 #include"boost/mpl/int.hpp"
 #include"boost/mpl/vector.hpp"
 #include"boost/mpl/equal.hpp"
+#include"boost/mpl/copy_if.hpp"
+#include"boost/mpl/unique.hpp"
 #include"boost/mpl/transform.hpp"
 #include"boost/mpl/front_inserter.hpp"
 #include"boost/mpl/print.hpp"
@@ -162,7 +164,7 @@ namespace parser_combinator
 					typename mpl::begin < seq_type >::type ,
 					typename mpl::end < seq_type >::type
 				>::type ,
-				mpl::push_front < mpl::_ , lhs_type >
+				mpl::push_back < mpl::vector < lhs_type > , mpl::_ >
 			>::type ;
 		} ;
 		template < typename T >
@@ -179,19 +181,269 @@ namespace parser_combinator
 		} ;
 		template < typename T1 , typename T2 >
 		struct make_LR0 < first_only_tuple < T1 , T2 > >
-			: mpl::transform < typename make_LR0 < T1 >::type , make_pair < T2 > >
+			: mpl::transform
+			<
+				typename make_LR0 < T1 >::type ,
+				make_pair < T2 >
+			>
 		{
 		} ;
 		template < typename T1 , typename ... T_ >
 		struct make_LR0 < std::tuple < T1 , T_ ... > >
-			: mpl::copy < typename make_LR0 < T1 >::type , mpl::back_inserter < typename make_LR0 < std::tuple < T_ ... > >::type > >
+			: mpl::unique
+			<
+				typename mpl::copy
+				<
+					typename make_LR0 < T1 >::type ,
+					mpl::back_inserter < typename make_LR0 < std::tuple < T_ ... > >::type >
+				>::type ,
+				std::is_same < mpl::_1 , mpl::_2 >
+			>
+		{
+		} ;
+		template < typename T >
+		struct is_top_rule
+			: mpl::false_
+		{
+		} ;
+		template < typename T , typename id_type , id_type id >
+		struct is_top_rule < top_rule < T , id_type , id > >
+			: mpl::true_
+		{
+		} ;
+		template < typename T >
+		struct eval_is_top_rule
+			: is_top_rule < typename T::type >
+		{
+		} ;
+		template < typename T >
+		struct is_not_terminal ;
+		template < typename T , typename id_type , id_type id >
+		struct is_not_terminal < top_rule < T , id_type , id > >
+			: mpl::true_
+		{
+		} ;
+		template < typename T , typename id_type , id_type id >
+		struct is_not_terminal < rule < T , id_type , id > >
+			: mpl::true_
+		{
+		} ;
+		template < typename T , typename id_type , id_type id >
+		struct is_not_terminal < terminal < T , id_type , id > >
+			: mpl::false_
+		{
+		} ;
+		template < typename T >
+		struct first
+		{
+			using type = typename T::first ;
+		} ;
+		template < typename T >
+		struct second
+		{
+			using type = typename T::second ;
+		} ;
+		template < typename T >
+		struct concat
+			: mpl::fold
+			<
+				T ,
+				mpl::vector < > ,
+				mpl::copy
+				<
+					mpl::_2 ,
+					mpl::back_inserter < mpl::_1 >
+				>
+			>
+		{
+		} ;
+		template < typename T >
+		struct eval
+			: T::type
+		{
+		} ;
+		template < typename T , typename set >
+		struct elem
+			: mpl::fold
+			<
+				set ,
+				mpl::bool_ < true > ,
+				mpl::and_ < std::is_same < mpl::_2 , T > , mpl::_1 >
+			>
+		{
+		} ;
+		template < typename T , typename set >
+		struct eval_elem
+			: elem
+			<
+				typename T::type ,
+				set
+			>
+		{
+		} ;
+		template < typename T >
+		struct get_rule_head
+			: mpl::at < typename T::first , mpl::int_ < 0 > >
+		{
+		} ;
+		template < typename T >
+		struct get_rule_body
+			: mpl::at < typename T::first , mpl::int_ < 1 > >
+		{
+		} ;
+		template < typename T , int N >
+		struct at_rule_body
+			: mpl::at < typename get_rule_body < T >::type , mpl::int_ < N > >
+		{
+		} ;
+		template < typename LR0s >
+		struct get_top_rules_helper
+			: mpl::copy_if
+			<
+				LR0s ,
+				eval_is_top_rule < get_rule_head < mpl::_ > > ,
+				mpl::back_inserter < mpl::vector < > >
+			>
+		{
+		} ;
+		template < typename T >
+		struct is_non_read
+			: std::is_same < typename at_rule_body < T , 0 >::type , current_read >
+		{
+		} ;
+		template < typename LR0s >
+		struct get_top_rules
+			: mpl::copy_if
+			<
+				typename get_top_rules_helper < LR0s >::type ,
+				is_non_read < mpl::_ > ,
+				mpl::back_inserter < mpl::vector < > >
+			>
+		{
+		} ;
+		template < typename T >
+		struct get_next_read
+			: mpl::deref
+			<
+				typename mpl::next
+				<
+					typename mpl::find
+					<
+						typename get_rule_body < T >::type ,
+						current_read
+					>::type
+				>::type
+			>
+		{
+		} ;
+		template < typename rules , typename env >
+		struct collect_rules_helper
+		{
+			using interim_rules = typename mpl::transform
+			<
+				rules ,
+				get_next_read < mpl::_ >
+			>::type ;
+			using rules_ = typename mpl::unique
+			<
+				interim_rules ,
+				std::is_same < mpl::_1 , mpl::_2 >
+			>::type ;
+			using interim_next_rules = typename mpl::copy_if
+			<
+				env ,
+				eval_elem < get_rule_head < mpl::_ > , rules_ > ,
+				mpl::back_inserter < mpl::vector < > >
+			>::type ;
+			using type = typename mpl::copy_if
+			<
+				interim_next_rules ,
+				is_non_read < mpl::_ > ,
+				mpl::back_inserter < mpl::vector < > >
+			>::type ;
+		} ;
+		template < typename rules , typename env >
+		struct collect_rules
+			: mpl::unique
+			<
+				typename collect_rules_helper
+				<
+					rules ,
+					env
+				>::type ,
+				std::is_same < mpl::_1 , mpl::_2 >
+			>
+		{
+		} ;
+		template < typename T1 , typename T2 >
+		struct is_not_include
+			: mpl::not_
+			<
+				typename elem
+				<
+					T1 ,
+					T2
+				>::type
+			>
+		{
+		} ;
+		template < typename newer , typename interim >
+		struct true_newer
+			: mpl::copy_if
+			<
+				newer ,
+				is_not_include < mpl::_ , interim > ,
+				mpl::back_inserter < mpl::vector < > >
+			>
+		{
+		} ;
+		template < typename interim , typename newer , typename env >
+		struct make_closure
+			: mpl::if_
+			<
+				mpl::empty < typename true_newer < newer , interim >::type > ,
+				interim ,
+				make_closure
+				<
+					typename concat
+					<
+						mpl::vector
+						<
+							interim ,
+							typename true_newer < newer , interim >::type
+						>
+					>::type ,
+					typename collect_rules
+					<
+						typename true_newer < newer , interim >::type ,
+						env
+					>::type ,
+					env
+				>
+			>
 		{
 		} ;
 		template < typename ... rules_type >
 		class parser
 		{
-			using rules_type_ = typename make_rules < 0 , std::tuple < > , rules_type ... >::type ;
-			using type = typename make_LR0 < rules_type_ >::type ;
+			using rules_type_ = typename make_rules
+			<
+				0 ,
+				std::tuple < > ,
+				rules_type ...
+			>::type ;
+			using LRs = typename make_LR0 < rules_type_ >::type ;
+			using top_rules = typename get_top_rules < LRs >::type ;
+			using type = typename make_closure
+			<
+				top_rules ,
+				typename collect_rules
+				<
+					top_rules ,
+					LRs
+				>::type ,
+				LRs
+			>::type ;
 			rules_type_ rules_ ;
 			// typename mpl::print < type >::type value ;
 		public :
