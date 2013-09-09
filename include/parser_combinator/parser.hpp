@@ -17,6 +17,10 @@ namespace parser_combinator
 		{
 			using type = current_read ;
 		} ;
+		struct end_read
+		{
+			using type = end_read ;
+		} ;
 		template < typename ... T >
 		struct variadic_vector
 		{
@@ -24,6 +28,8 @@ namespace parser_combinator
 		} ;
 		template < typename T >
 		struct to_variadic_vector ;
+		template < typename iter1 , typename iter2 >
+		struct to_variadic_vector_iter ;
 		template < typename T >
 		struct from_variadic_vector ;
 		template < typename ... T >
@@ -62,6 +68,16 @@ namespace parser_combinator
 				variadic_vector < > ,
 				typename mpl::begin < T >::type ,
 				typename mpl::end < T >::type
+			>
+		{
+		} ;
+		template < typename iter1 , typename iter2 >
+		struct to_variadic_vector_iter
+			: to_variadic_vector_helper
+			<
+				variadic_vector < > ,
+				iter1 ,
+				iter2
 			>
 		{
 		} ;
@@ -307,16 +323,6 @@ namespace parser_combinator
 			: mpl::false_
 		{
 		} ;
-		template < typename T >
-		struct first
-		{
-			using type = typename T::first ;
-		} ;
-		template < typename T >
-		struct second
-		{
-			using type = typename T::second ;
-		} ;
 		template < typename T , typename iter1 , typename iter2 >
 		struct concat_helper ;
 		template < typename T , typename iter >
@@ -378,7 +384,7 @@ namespace parser_combinator
 			: elem
 			<
 				typename T::type ,
-				set
+				typename set::type
 			>
 		{
 		} ;
@@ -443,7 +449,7 @@ namespace parser_combinator
 			using interim_next_rules = typename mpl::copy_if
 			<
 				env ,
-				eval_elem < get_rule_head < mpl::_ > , rules_ > ,
+				eval_elem < get_rule_head < mpl::_ > , mpl::identity < rules_ > > ,
 				mpl::back_inserter < mpl::vector < > >
 			>::type ;
 			using type = typename mpl::copy_if
@@ -549,6 +555,211 @@ namespace parser_combinator
 			>
 		{
 		} ;
+		template < typename i , typename X >
+		struct next_current_read
+			: std::is_same
+			<
+				typename mpl::deref
+				<
+					typename mpl::next
+					<
+						typename mpl::find
+						<
+							typename get_rule_body < i >::type ,
+							X
+						>::type
+					>::type
+				>::type ,
+				current_read
+			>
+		{
+		} ;
+		template < typename I , typename X >
+		struct make_goto_helper
+			: mpl::copy_if
+			<
+				I ,
+				next_current_read < mpl::_ , X > ,
+				mpl::back_inserter < mpl::vector < > >
+			>
+		{
+		} ;
+		template < typename I , typename X >
+		struct make_goto
+			: make_closure
+			<
+				mpl::vector < > ,
+				typename make_goto_helper
+				<
+					I ,
+					X
+				>::type ,
+				I
+			>
+		{
+		} ;
+		template < typename T1 , typename T2 >
+		struct eval_is_same
+			: std::is_same < typename T1::type , T2 >
+		{
+		} ;
+		template < typename a , typename env >
+		struct make_first ;
+		template < typename T , typename id_type , id_type id , typename env >
+		struct make_first < variadic_vector < terminal < T , id_type , id > > , env >
+		{
+			using type = mpl::vector < terminal < T , id_type , id > > ;
+		} ;
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id , typename env >
+		struct make_first < variadic_vector < rule_type < T , id_type , id > > , env >
+			: make_first
+			<
+				typename variadic_vector
+				<
+					typename mpl::unique
+					<
+						typename concat
+						<
+							typename mpl::transform
+							<
+								typename mpl::copy_if
+								<
+									env ,
+									eval_is_same < get_rule_head < mpl::_ > , rule_type < T , id_type , id > > ,
+									mpl::back_inserter < mpl::vector < > >
+								>::type ,
+								get_rule_body < mpl::_ > ,
+								mpl::back_inserter < mpl::vector < > >
+							>::type
+						>::type ,
+						std::is_same < mpl::_1 , mpl::_2 >
+					>
+				>::type ,
+				env
+			>
+		{
+		} ;
+		template < typename T_ , typename ... T , typename env >
+		struct make_first < variadic_vector < T_ , T ... > , env >
+			: mpl::unique
+			<
+				typename mpl::copy
+				<
+					typename make_first
+					<
+						T_ ,
+						env
+					>::type ,
+					mpl::back_inserter
+					<
+						typename make_first
+						<
+							variadic_vector < T ... > ,
+							env
+						>::type
+					>
+				>::type ,
+				std::is_same < mpl::_1 , mpl::_2 >
+			>
+		{
+		} ;
+		template < typename T , typename env >
+		struct make_follow ;
+		template < typename T , typename vec , typename env >
+		struct make_follow_helper ;
+		template < typename T , typename vec , typename env >
+		struct make_follow_element ;
+		template < bool is_end , typename T , typename iter1 , typename iter2 , typename env >
+		struct make_follow_element_helper ;
+		template < typename T , typename iter1 , typename iter2 , typename env >
+		struct make_follow_element_helper < true , T , iter1 , iter2 , env >
+			: make_follow
+			<
+				T ,
+				env
+			>
+		{
+		} ;
+		template < typename T , typename iter1 , typename iter2 , typename env >
+		struct make_follow_element_helper < false , T , iter1 , iter2 , env >
+			: make_first
+			<
+				typename to_variadic_vector_iter
+				<
+					iter1 ,
+					iter2
+				>::type ,
+				env
+			>
+		{
+		} ;
+		template < typename T , typename rule_type , typename env >
+		struct make_follow_element
+			: make_follow_element_helper
+			<
+				std::is_same
+				<
+					typename mpl::next
+					<
+						typename mpl::find
+						<
+							typename get_rule_body < rule_type >::type ,
+							T
+						>::type
+					>::type ,
+					typename mpl::end
+					<
+						typename get_rule_body < rule_type >::type
+					>::type
+				>::type::value ,
+				typename get_rule_head < rule_type >::type ,
+				typename mpl::next
+				<
+					typename mpl::find
+					<
+						typename get_rule_body < rule_type >::type ,
+						T
+					>::type
+				>::type ,
+				typename mpl::end
+				<
+					typename get_rule_body < rule_type >::type
+				>::type ,
+				env
+			>
+		{
+		} ;
+		template < typename T , typename vec , typename env >
+		struct make_follow_helper
+			: mpl::push_back
+			<
+				typename concat
+				<
+					typename mpl::transform
+					<
+						vec ,
+						make_follow_element < T , mpl::_ , env >
+					>::type
+				>::type ,
+				end_read
+			>
+		{
+		} ;
+		template < typename T , typename env >
+		struct make_follow
+			: make_follow_helper
+			<
+				T ,
+				typename mpl::copy_if
+				<
+					env ,
+					eval_elem < mpl::identity < T > , get_rule_body < mpl::_ > > ,
+					mpl::back_inserter < mpl::vector < > >
+				>::type ,
+				env
+			>
+		{
+		} ;
 		template < typename ... rules_type >
 		class parser
 		{
@@ -563,7 +774,7 @@ namespace parser_combinator
 				rules_type_
 			>::type ;
 			using top_rules = typename get_top_rules < LRs >::type ;
-			using type = typename make_closure
+			using closure = typename make_closure
 			<
 				top_rules ,
 				typename collect_rules
