@@ -647,7 +647,7 @@ namespace parser_combinator
 				<
 					typename make_first
 					<
-						T_ ,
+						variadic_vector < T_ > ,
 						env
 					>::type ,
 					mpl::back_inserter
@@ -717,13 +717,19 @@ namespace parser_combinator
 				<
 					typename mpl::find
 					<
-						typename get_rule_body < rule_type >::type ,
+						typename make_LR0
+						<
+							typename get_rule_body < rule_type >::type
+						>::type ,
 						T
 					>::type
 				>::type ,
 				typename mpl::end
 				<
-					typename get_rule_body < rule_type >::type
+					typename make_LR0
+					<
+						typename get_rule_body < rule_type >::type
+					>::type
 				>::type ,
 				env
 			>
