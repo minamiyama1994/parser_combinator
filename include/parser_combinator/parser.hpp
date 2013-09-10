@@ -2,9 +2,9 @@
 #define PARSER_COMBINATOR_PARSER_HPP
 #include"boost/mpl/int.hpp"
 #include"boost/mpl/vector.hpp"
+#include"boost/mpl/set.hpp"
 #include"boost/mpl/equal.hpp"
 #include"boost/mpl/copy_if.hpp"
-#include"boost/mpl/unique.hpp"
 #include"boost/mpl/transform.hpp"
 #include"boost/mpl/front_inserter.hpp"
 #include"boost/mpl/print.hpp"
@@ -13,6 +13,108 @@ namespace parser_combinator
 	namespace parser
 	{
 		namespace mpl = boost::mpl ;
+		template < typename seq >
+		struct empty_seq ;
+		template < >
+		struct empty_seq < mpl::sequence_tag < mpl::vector < > >::type >
+		{
+			using type = mpl::vector < > ;
+		} ;
+		template < >
+		struct empty_seq < mpl::sequence_tag < mpl::set < > >::type >
+		{
+			using type = mpl::set < > ;
+		} ;
+		template < typename T1 , typename T2 , typename T3 >
+		struct eval_insert
+			: mpl::insert
+			<
+				typename T1::type ,
+				typename T2::type ,
+				typename T3::type
+			>
+		{
+		} ;
+		template < typename T >
+		struct back_inserter
+			: mpl::inserter
+			<
+				T ,
+				mpl::insert
+				<
+					mpl::identity < mpl::_1 > ,
+					mpl::end < mpl::_1 > ,
+					mpl::identity < mpl::_2 >
+				>
+			>
+		{
+		} ;
+		template < typename T1 , typename T2 >
+		struct concat_helper ;
+		template < typename T1 , typename T2 >
+		struct concat_helper
+			: mpl::copy
+			<
+				T2 ,
+				back_inserter < T1 >
+			>
+		{
+		} ;
+		template < typename T >
+		struct concat
+			: mpl::fold
+			<
+				T ,
+				typename empty_seq < typename mpl::sequence_tag < T >::type >::type ,
+				concat_helper < mpl::_1 , mpl::_2 >
+			>
+		{
+		} ;
+		template < typename seq , typename iter1 , typename iter2 , typename func >
+		struct map_helper ;
+		template < typename seq , typename iter , typename func >
+		struct map_helper < seq , iter , iter , func >
+			: mpl::identity < seq >
+		{
+		} ;
+		template < typename seq , typename iter1 , typename iter2 , typename func >
+		struct map_helper
+			: mpl::eval_if
+			<
+				std::is_same < iter1 , iter2 > ,
+				mpl::identity < seq > ,
+				map_helper
+				<
+					typename mpl::insert
+					<
+						seq ,
+						typename mpl::end < seq >::type ,
+						typename mpl::lambda < func >::type::template apply
+						<
+							typename mpl::deref
+							<
+								iter1
+							>::type
+						>::type
+					>::type ,
+					typename mpl::next < iter1 >::type ,
+					iter2 ,
+					func
+				>
+			>
+		{
+		} ;
+		template < typename seq , typename func >
+		struct map
+			: map_helper
+			<
+				typename empty_seq < typename mpl::sequence_tag < seq >::type >::type ,
+				typename mpl::begin < seq >::type ,
+				typename mpl::end < seq >::type ,
+				func
+			>
+		{
+		} ;
 		struct current_read
 		{
 			using type = current_read ;
@@ -195,24 +297,18 @@ namespace parser_combinator
 		} ;
 		template < typename T >
 		struct shift_to_vector ;
-		template < typename T , typename id_type , id_type id >
-		struct shift_to_vector < top_rule < T , id_type , id > >
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
+		struct shift_to_vector < rule_type < T , id_type , id > >
 		{
-			using type = mpl::vector < top_rule < T , id_type , id > > ;
-		} ;
-		template < typename T , typename id_type , id_type id >
-		struct shift_to_vector < rule < T , id_type , id > >
-		{
-			using type = mpl::vector < rule < T , id_type , id > > ;
-		} ;
-		template < typename T , typename id_type , id_type id >
-		struct shift_to_vector < terminal < T , id_type , id > >
-		{
-			using type = mpl::vector < terminal < T , id_type , id > > ;
+			using type = mpl::vector < rule_type < T , id_type , id > > ;
 		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct shift_to_vector < shift_result < lhs_type , rhs_type > >
-			: mpl::push_back < typename shift_to_vector < lhs_type >::type , rhs_type >
+			: mpl::push_back
+			<
+				typename shift_to_vector < lhs_type >::type ,
+				rhs_type
+			>
 		{
 		} ;
 		template < typename T1 , typename T2 , typename T3 , typename T4 >
@@ -220,14 +316,18 @@ namespace parser_combinator
 			: mpl::eval_if
 			<
 				std::is_same < T3 , T4 > ,
-				mpl::push_back
+				mpl::insert
 				<
 					T1 ,
-					typename mpl::push_back < T2 , current_read >::type
+					typename mpl::push_back
+					<
+						T2 ,
+						current_read
+					>::type
 				> ,
 				vector_to_LR0
 				<
-					typename mpl::push_back
+					typename mpl::insert
 					<
 						T1 ,
 						typename mpl::insert < T2 , T3 , current_read >::type
@@ -245,16 +345,20 @@ namespace parser_combinator
 		struct assign_to_vector < assign_result < lhs_type , rhs_type > >
 		{
 			using seq_type = typename shift_to_vector < rhs_type >::type ;
-			using type = typename mpl::transform
+			using type = typename map
 			<
 				typename vector_to_LR0
 				<
-					mpl::vector < > ,
+					mpl::set < > ,
 					seq_type ,
 					typename mpl::begin < seq_type >::type ,
 					typename mpl::end < seq_type >::type
 				>::type ,
-				mpl::push_back < mpl::vector < lhs_type > , mpl::_ >
+				mpl::push_back
+				<
+					mpl::vector < lhs_type > ,
+					mpl::_
+				>
 			>::type ;
 		} ;
 		template < typename T >
@@ -262,7 +366,7 @@ namespace parser_combinator
 		template < >
 		struct make_LR0 < std::tuple < > >
 		{
-			using type = mpl::vector < > ;
+			using type = mpl::set < > ;
 		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct make_LR0 < assign_result < lhs_type , rhs_type > >
@@ -271,7 +375,7 @@ namespace parser_combinator
 		} ;
 		template < typename T1 , typename T2 >
 		struct make_LR0 < first_only_tuple < T1 , T2 > >
-			: mpl::transform
+			: map
 			<
 				typename make_LR0 < T1 >::type ,
 				make_pair < T2 >
@@ -280,14 +384,13 @@ namespace parser_combinator
 		} ;
 		template < typename T1 , typename ... T_ >
 		struct make_LR0 < std::tuple < T1 , T_ ... > >
-			: mpl::unique
+			: concat
 			<
-				typename mpl::copy
+				mpl::set
 				<
 					typename make_LR0 < T1 >::type ,
-					mpl::back_inserter < typename make_LR0 < std::tuple < T_ ... > >::type >
-				>::type ,
-				std::is_same < mpl::_1 , mpl::_2 >
+					typename make_LR0 < std::tuple < T_ ... > >::type
+				>
 			>
 		{
 		} ;
@@ -321,37 +424,6 @@ namespace parser_combinator
 		template < typename T , typename id_type , id_type id >
 		struct is_not_terminal < terminal < T , id_type , id > >
 			: mpl::false_
-		{
-		} ;
-		template < typename T , typename iter1 , typename iter2 >
-		struct concat_helper ;
-		template < typename T , typename iter >
-		struct concat_helper < T , iter , iter >
-		{
-			using type = T ;
-		} ;
-		template < typename T , typename iter1 , typename iter2 >
-		struct concat_helper
-			: concat_helper
-			<
-				typename mpl::copy
-				<
-					typename mpl::deref < iter1 >::type ,
-					mpl::back_inserter < T >
-				>::type ,
-				typename mpl::next < iter1 >::type ,
-				iter2
-			>
-		{
-		} ;
-		template < typename T >
-		struct concat
-			: concat_helper
-			<
-				mpl::vector < > ,
-				typename mpl::begin < T >::type ,
-				typename mpl::end < T >::type
-			>
 		{
 		} ;
 		template < typename T >
@@ -404,7 +476,7 @@ namespace parser_combinator
 			<
 				LR0s ,
 				eval_is_top_rule < get_rule_head < mpl::_ > > ,
-				mpl::back_inserter < mpl::vector < > >
+				mpl::inserter < mpl::set < > , mpl::insert < mpl::_1 , mpl::_2 > >
 			>
 		{
 		} ;
@@ -419,7 +491,7 @@ namespace parser_combinator
 			<
 				typename get_top_rules_helper < LR0s >::type ,
 				is_non_read < mpl::_ > ,
-				mpl::back_inserter < mpl::vector < > >
+				mpl::inserter < mpl::set < > , mpl::insert < mpl::_1 , mpl::_2 > >
 			>
 		{
 		} ;
@@ -441,7 +513,7 @@ namespace parser_combinator
 		template < typename rules , typename env >
 		struct collect_rules_helper
 		{
-			using rules_ = typename mpl::transform
+			using rules_ = typename map
 			<
 				rules ,
 				get_next_read < mpl::_ >
@@ -450,25 +522,25 @@ namespace parser_combinator
 			<
 				env ,
 				eval_elem < get_rule_head < mpl::_ > , mpl::identity < rules_ > > ,
-				mpl::back_inserter < mpl::vector < > >
+				back_inserter < mpl::vector < > >
 			>::type ;
 			using type = typename mpl::copy_if
 			<
 				interim_next_rules ,
 				is_non_read < mpl::_ > ,
-				mpl::back_inserter < mpl::vector < > >
+				back_inserter < mpl::vector < > >
 			>::type ;
 		} ;
 		template < typename rules , typename env >
 		struct collect_rules
-			: mpl::unique
+			: mpl::copy
 			<
 				typename collect_rules_helper
 				<
 					rules ,
 					env
 				>::type ,
-				std::is_same < mpl::_1 , mpl::_2 >
+				mpl::inserter < mpl::set < > , mpl::insert < mpl::_1 , mpl::_2 > >
 			>
 		{
 		} ;
@@ -490,7 +562,7 @@ namespace parser_combinator
 			<
 				newer ,
 				is_not_include < mpl::_ , interim > ,
-				mpl::back_inserter < mpl::vector < > >
+				back_inserter < mpl::vector < > >
 			>
 		{
 		} ;
@@ -580,7 +652,7 @@ namespace parser_combinator
 			<
 				I ,
 				next_current_read < mpl::_ , X > ,
-				mpl::back_inserter < mpl::vector < > >
+				back_inserter < mpl::vector < > >
 			>
 		{
 		} ;
@@ -608,40 +680,40 @@ namespace parser_combinator
 		template < typename T , typename id_type , id_type id , typename env >
 		struct make_first < variadic_vector < terminal < T , id_type , id > > , env >
 		{
-			using type = mpl::vector < terminal < T , id_type , id > > ;
+			using type = mpl::set < terminal < T , id_type , id > > ;
 		} ;
 		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id , typename env >
 		struct make_first < variadic_vector < rule_type < T , id_type , id > > , env >
-			: make_first
+			: mpl::copy
 			<
-				typename variadic_vector
+				typename concat
 				<
-					typename mpl::unique
+					typename map
 					<
-						typename concat
+						typename map
 						<
-							typename mpl::transform
+							typename map
 							<
 								typename mpl::copy_if
 								<
 									env ,
 									eval_is_same < get_rule_head < mpl::_ > , rule_type < T , id_type , id > > ,
-									mpl::back_inserter < mpl::vector < > >
+									back_inserter < mpl::vector < > >
 								>::type ,
-								get_rule_body < mpl::_ > ,
-								mpl::back_inserter < mpl::vector < > >
-							>::type
+								get_rule_body < mpl::_ >
+							>::type ,
+							to_variadic_vector < mpl::_ >
 						>::type ,
-						std::is_same < mpl::_1 , mpl::_2 >
-					>
+						make_first < mpl::_ , env >
+					>::type
 				>::type ,
-				env
+				mpl::inserter < mpl::set < > , mpl::insert < mpl::_1 , mpl::_2 > >
 			>
 		{
 		} ;
 		template < typename T_ , typename ... T , typename env >
 		struct make_first < variadic_vector < T_ , T ... > , env >
-			: mpl::unique
+			: mpl::copy
 			<
 				typename mpl::copy
 				<
@@ -650,7 +722,7 @@ namespace parser_combinator
 						variadic_vector < T_ > ,
 						env
 					>::type ,
-					mpl::back_inserter
+					back_inserter
 					<
 						typename make_first
 						<
@@ -659,7 +731,7 @@ namespace parser_combinator
 						>::type
 					>
 				>::type ,
-				std::is_same < mpl::_1 , mpl::_2 >
+				mpl::inserter < mpl::set < > , mpl::insert < mpl::_1 , mpl::_2 > >
 			>
 		{
 		} ;
@@ -717,34 +789,47 @@ namespace parser_combinator
 				<
 					typename mpl::find
 					<
-						typename make_LR0
-						<
-							typename get_rule_body < rule_type >::type
-						>::type ,
+						typename get_rule_body < rule_type >::type ,
 						T
 					>::type
 				>::type ,
 				typename mpl::end
 				<
-					typename make_LR0
-					<
-						typename get_rule_body < rule_type >::type
-					>::type
+					typename get_rule_body < rule_type >::type
 				>::type ,
 				env
 			>
 		{
 		} ;
 		template < typename T , typename vec , typename env >
-		struct make_follow_helper
-			: mpl::push_back
+		struct make_follow_helper_helper
+			: concat
 			<
-				typename concat
+				typename map
 				<
-					typename mpl::transform
+					vec ,
+					make_follow_element < T , mpl::_ , env >
+				>::type
+			>
+		{
+		} ;
+		template < typename T , typename vec , typename env >
+		struct make_follow_helper
+			: mpl::insert
+			<
+				typename make_follow_helper_helper
+				<
+					T ,
+					vec ,
+					env
+				>::type ,
+				typename mpl::end
+				<
+					typename make_follow_helper_helper
 					<
+						T ,
 						vec ,
-						make_follow_element < T , mpl::_ , env >
+						env
 					>::type
 				>::type ,
 				end_read
@@ -760,9 +845,24 @@ namespace parser_combinator
 				<
 					env ,
 					eval_elem < mpl::identity < T > , get_rule_body < mpl::_ > > ,
-					mpl::back_inserter < mpl::vector < > >
+					back_inserter < mpl::vector < > >
 				>::type ,
 				env
+			>
+		{
+		} ;
+		template < typename T >
+		struct get_top_rule
+			: get_rule_head
+			<
+				typename mpl::deref
+				<
+					typename mpl::find
+					<
+						T ,
+						eval_is_top_rule < get_rule_head < mpl::_ > >
+					>::type
+				>::type
 			>
 		{
 		} ;
@@ -791,7 +891,7 @@ namespace parser_combinator
 				LRs
 			>::type ;
 			rules_type_ rules_ ;
-			//typename mpl::print < typename to_variadic_vector < type >::type >::type value ;
+			// typename mpl::print < typename to_variadic_vector < closure >::type >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
