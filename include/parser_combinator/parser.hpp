@@ -1,120 +1,50 @@
 #ifndef PARSER_COMBINATOR_PARSER_HPP
 #define PARSER_COMBINATOR_PARSER_HPP
-#include"boost/mpl/int.hpp"
-#include"boost/mpl/vector.hpp"
-#include"boost/mpl/set.hpp"
-#include"boost/mpl/equal.hpp"
-#include"boost/mpl/copy_if.hpp"
-#include"boost/mpl/transform.hpp"
-#include"boost/mpl/front_inserter.hpp"
-#include"boost/mpl/print.hpp"
+#include"TMP/all.hpp"
+#include"TMP/and.hpp"
+#include"TMP/any.hpp"
+#include"TMP/append.hpp"
+#include"TMP/at.hpp"
+#include"TMP/complement.hpp"
+#include"TMP/composite.hpp"
+#include"TMP/concat.hpp"
+#include"TMP/cons.hpp"
+#include"TMP/elem.hpp"
+#include"TMP/empty.hpp"
+#include"TMP/equal.hpp"
+#include"TMP/eval_if.hpp"
+#include"TMP/eval_if_c.hpp"
+#include"TMP/filter.hpp"
+#include"TMP/foldl.hpp"
+#include"TMP/foldr.hpp"
+#include"TMP/head.hpp"
+#include"TMP/id.hpp"
+#include"TMP/if.hpp"
+#include"TMP/if_c.hpp"
+#include"TMP/insert.hpp"
+#include"TMP/integral.hpp"
+#include"TMP/intersection.hpp"
+#include"TMP/lambda.hpp"
+#include"TMP/list.hpp"
+#include"TMP/list_to_set.hpp"
+#include"TMP/map.hpp"
+#include"TMP/nand.hpp"
+#include"TMP/not.hpp"
+#include"TMP/or.hpp"
+#include"TMP/print.hpp"
+#include"TMP/set.hpp"
+#include"TMP/set_to_list.hpp"
+#include"TMP/size.hpp"
+#include"TMP/symmetric_difference.hpp"
+#include"TMP/tail.hpp"
+#include"TMP/union.hpp"
+#include"TMP/unique.hpp"
+#include"TMP/xor.hpp"
+#include"TMP/zip.hpp"
 namespace parser_combinator
 {
 	namespace parser
 	{
-		namespace mpl = boost::mpl ;
-		template < typename seq >
-		struct empty_seq ;
-		template < >
-		struct empty_seq < mpl::sequence_tag < mpl::vector < > >::type >
-		{
-			using type = mpl::vector < > ;
-		} ;
-		template < >
-		struct empty_seq < mpl::sequence_tag < mpl::set < > >::type >
-		{
-			using type = mpl::set < > ;
-		} ;
-		template < typename T1 , typename T2 , typename T3 >
-		struct eval_insert
-			: mpl::insert
-			<
-				typename T1::type ,
-				typename T2::type ,
-				typename T3::type
-			>
-		{
-		} ;
-		template < typename T >
-		struct back_inserter
-			: mpl::inserter
-			<
-				T ,
-				mpl::insert
-				<
-					mpl::identity < mpl::_1 > ,
-					mpl::end < mpl::_1 > ,
-					mpl::identity < mpl::_2 >
-				>
-			>
-		{
-		} ;
-		template < typename T1 , typename T2 >
-		struct concat_helper ;
-		template < typename T1 , typename T2 >
-		struct concat_helper
-			: mpl::copy
-			<
-				T2 ,
-				back_inserter < T1 >
-			>
-		{
-		} ;
-		template < typename T >
-		struct concat
-			: mpl::fold
-			<
-				T ,
-				typename empty_seq < typename mpl::sequence_tag < T >::type >::type ,
-				concat_helper < mpl::_1 , mpl::_2 >
-			>
-		{
-		} ;
-		template < typename seq , typename iter1 , typename iter2 , typename func >
-		struct map_helper ;
-		template < typename seq , typename iter , typename func >
-		struct map_helper < seq , iter , iter , func >
-			: mpl::identity < seq >
-		{
-		} ;
-		template < typename seq , typename iter1 , typename iter2 , typename func >
-		struct map_helper
-			: mpl::eval_if
-			<
-				std::is_same < iter1 , iter2 > ,
-				mpl::identity < seq > ,
-				map_helper
-				<
-					typename mpl::insert
-					<
-						seq ,
-						typename mpl::end < seq >::type ,
-						typename mpl::lambda < func >::type::template apply
-						<
-							typename mpl::deref
-							<
-								iter1
-							>::type
-						>::type
-					>::type ,
-					typename mpl::next < iter1 >::type ,
-					iter2 ,
-					func
-				>
-			>
-		{
-		} ;
-		template < typename seq , typename func >
-		struct map
-			: map_helper
-			<
-				typename empty_seq < typename mpl::sequence_tag < seq >::type >::type ,
-				typename mpl::begin < seq >::type ,
-				typename mpl::end < seq >::type ,
-				func
-			>
-		{
-		} ;
 		struct current_read
 		{
 			using type = current_read ;
@@ -122,91 +52,6 @@ namespace parser_combinator
 		struct end_read
 		{
 			using type = end_read ;
-		} ;
-		template < typename ... T >
-		struct variadic_vector
-		{
-			using type = variadic_vector ;
-		} ;
-		template < typename T >
-		struct to_variadic_vector ;
-		template < typename iter1 , typename iter2 >
-		struct to_variadic_vector_iter ;
-		template < typename T >
-		struct from_variadic_vector ;
-		template < typename ... T >
-		struct from_variadic_vector < variadic_vector < T ... > >
-		{
-			using type = mpl::vector < T ... > ;
-		} ;
-		template < typename T , typename T1 , typename T2 >
-		struct to_variadic_vector_helper ;
-		template < >
-		struct to_variadic_vector < current_read >
-			: current_read
-		{
-		} ;
-		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
-		struct to_variadic_vector < rule_type < T , id_type , id > >
-			: rule_type < T , id_type , id >
-		{
-		} ;
-		template < typename T1 , typename T2 >
-		struct to_variadic_vector < mpl::pair < T1 , T2 > >
-			: mpl::pair
-			<
-				typename to_variadic_vector
-				<
-					T1
-				>::type ,
-				T2
-			>
-		{
-		} ;
-		template < typename T >
-		struct to_variadic_vector
-			: to_variadic_vector_helper
-			<
-				variadic_vector < > ,
-				typename mpl::begin < T >::type ,
-				typename mpl::end < T >::type
-			>
-		{
-		} ;
-		template < typename iter1 , typename iter2 >
-		struct to_variadic_vector_iter
-			: to_variadic_vector_helper
-			<
-				variadic_vector < > ,
-				iter1 ,
-				iter2
-			>
-		{
-		} ;
-		template < typename ... T , typename T1 >
-		struct to_variadic_vector_helper < variadic_vector < T ... > , T1 , T1 >
-			: variadic_vector < T ... >
-		{
-		} ;
-		template < typename ... T , typename T1 , typename T2 >
-		struct to_variadic_vector_helper < variadic_vector < T ... > , T1 , T2 >
-			: to_variadic_vector_helper
-			<
-				variadic_vector
-				<
-					T ... ,
-					typename to_variadic_vector
-					<
-						typename mpl::deref
-						<
-							T1
-						>::type
-					>::type
-				> ,
-				typename mpl::next < T1 >::type ,
-				T2
-			>
-		{
 		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct assign_result ;
@@ -283,177 +128,152 @@ namespace parser_combinator
 		} ;
 		template < int index , typename ... type_in_tuple , typename args_head , typename ... args_type >
 		struct make_rules < index , std::tuple < type_in_tuple ... > , args_head , args_type ... >
-			: make_rules < index + 1 , std::tuple < type_in_tuple ... , first_only_tuple < args_head , mpl::int_ < index > > > , args_type ... >
+			: make_rules < index + 1 , std::tuple < type_in_tuple ... , first_only_tuple < args_head , tmp::integral < unsigned int , index > > > , args_type ... >
 		{
-		} ;
-		template < typename T1 >
-		struct make_pair
-		{
-			template < typename T2 >
-			struct apply
-			{
-				using type = mpl::pair < T2 , T1 > ;
-			} ;
 		} ;
 		template < typename T >
-		struct shift_to_vector ;
+		struct shift_to_list ;
 		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
-		struct shift_to_vector < rule_type < T , id_type , id > >
+		struct shift_to_list < rule_type < T , id_type , id > >
 		{
-			using type = mpl::vector < rule_type < T , id_type , id > > ;
+			using type = tmp::list < rule_type < T , id_type , id > > ;
 		} ;
 		template < typename lhs_type , typename rhs_type >
-		struct shift_to_vector < shift_result < lhs_type , rhs_type > >
-			: mpl::push_back
+		struct shift_to_list < shift_result < lhs_type , rhs_type > >
+			: tmp::concat
 			<
-				typename shift_to_vector < lhs_type >::type ,
-				rhs_type
+				tmp::list
+				<
+					typename shift_to_list < lhs_type >::type ,
+					tmp::list < rhs_type >
+				>
 			>
 		{
 		} ;
-		template < typename T1 , typename T2 , typename T3 , typename T4 >
-		struct vector_to_LR0
-			: mpl::eval_if
+		template < typename T1 , typename T2 >
+		struct list_to_LR0 ;
+		template < typename ... T1 , typename T2 , typename  ... T2s >
+		struct list_to_LR0 < tmp::list < T1 ... > , tmp::list < T2 , T2s ... > >
+			: tmp::cons
 			<
-				std::is_same < T3 , T4 > ,
-				mpl::insert
+				tmp::list < T1 ... , current_read , T2 , T2s ... > ,
+				typename list_to_LR0
 				<
-					T1 ,
-					typename mpl::push_back
-					<
-						T2 ,
-						current_read
-					>::type
-				> ,
-				vector_to_LR0
-				<
-					typename mpl::insert
-					<
-						T1 ,
-						typename mpl::insert < T2 , T3 , current_read >::type
-					>::type ,
-					T2 ,
-					typename mpl::next < T3 >::type ,
-					T4
-				>
+					tmp::list < T1 ... , T2 > ,
+					tmp::list < T2s ... >
+				>::type
 			>
+		{
+		} ;
+		template < typename ... T1 >
+		struct list_to_LR0 < tmp::list < T1 ... > , tmp::list < > >
+			: tmp::list < tmp::list < T1 ... , current_read > >
 		{
 		} ;
 		template < typename T >
-		struct assign_to_vector ;
+		struct assign_to_list ;
 		template < typename lhs_type , typename rhs_type >
-		struct assign_to_vector < assign_result < lhs_type , rhs_type > >
-		{
-			using seq_type = typename shift_to_vector < rhs_type >::type ;
-			using type = typename map
+		struct assign_to_list < assign_result < lhs_type , rhs_type > >
+			: tmp::map
 			<
-				typename vector_to_LR0
+				tmp::list < lhs_type , tmp::arg < 0 > > ,
+				typename list_to_LR0
 				<
-					mpl::set < > ,
-					seq_type ,
-					typename mpl::begin < seq_type >::type ,
-					typename mpl::end < seq_type >::type
-				>::type ,
-				mpl::push_back
-				<
-					mpl::vector < lhs_type > ,
-					mpl::_
-				>
-			>::type ;
+					tmp::list < > ,
+					typename shift_to_list < rhs_type >::type
+				>::type
+			>
+		{
 		} ;
 		template < typename T >
 		struct make_LR0 ;
 		template < >
 		struct make_LR0 < std::tuple < > >
 		{
-			using type = mpl::set < > ;
+			using type = tmp::set < > ;
 		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct make_LR0 < assign_result < lhs_type , rhs_type > >
-			: assign_to_vector < assign_result < lhs_type , rhs_type > >
+			: tmp::list_to_set
+			<
+				typename assign_to_list
+				<
+					assign_result < lhs_type , rhs_type >
+				>::type
+			>
 		{
 		} ;
 		template < typename T1 , typename T2 >
 		struct make_LR0 < first_only_tuple < T1 , T2 > >
-			: map
+			: tmp::map
 			<
-				typename make_LR0 < T1 >::type ,
-				make_pair < T2 >
+				tmp::list < tmp::arg < 0 > , T2 > ,
+				typename tmp::set_to_list < typename make_LR0 < T1 >::type >::type
 			>
 		{
 		} ;
 		template < typename T1 , typename ... T_ >
 		struct make_LR0 < std::tuple < T1 , T_ ... > >
-			: concat
+			: tmp::list_to_set
 			<
-				mpl::set
+				typename tmp::concat
 				<
-					typename make_LR0 < T1 >::type ,
-					typename make_LR0 < std::tuple < T_ ... > >::type
-				>
+					tmp::list
+					<
+						typename make_LR0 < T1 >::type ,
+						typename tmp::set_to_list
+						<
+							typename make_LR0 < std::tuple < T_ ... > >::type
+						>::type
+					>
+				>::type
 			>
 		{
 		} ;
 		template < typename T >
 		struct is_top_rule
-			: mpl::false_
+			: tmp::integral < bool , false >
 		{
 		} ;
 		template < typename T , typename id_type , id_type id >
 		struct is_top_rule < top_rule < T , id_type , id > >
-			: mpl::true_
+			: tmp::integral < bool , true >
+		{
+		} ;
+		template < typename T >
+		struct get_rule_head
+			: tmp::at
+			<
+				typename tmp::at < T , tmp::integral < unsigned int , 0 > >::type ,
+				tmp::integral < unsigned int , 0 >
+			>
 		{
 		} ;
 		template < typename T >
 		struct eval_is_top_rule
-			: is_top_rule < typename T::type >
+			: is_top_rule < typename get_rule_head < T >::type >
 		{
 		} ;
 		template < typename T >
 		struct is_not_terminal ;
 		template < typename T , typename id_type , id_type id >
 		struct is_not_terminal < top_rule < T , id_type , id > >
-			: mpl::true_
+			: tmp::integral < bool , true >
 		{
 		} ;
 		template < typename T , typename id_type , id_type id >
 		struct is_not_terminal < rule < T , id_type , id > >
-			: mpl::true_
+			: tmp::integral < bool , true >
 		{
 		} ;
 		template < typename T , typename id_type , id_type id >
 		struct is_not_terminal < terminal < T , id_type , id > >
-			: mpl::false_
-		{
-		} ;
-		template < typename T >
-		struct eval
-			: T::type
-		{
-		} ;
-		template < typename T , typename T1 , typename T2 >
-		struct is_same_for_fold
-			: mpl::or_ < typename std::is_same < T2 , T >::type , T1 >
-		{
-		} ;
-		template < typename T , typename set >
-		struct elem
-			: mpl::fold
-			<
-				set ,
-				mpl::bool_ < false > ,
-				is_same_for_fold < T , mpl::_1 , mpl::_2 >
-			>
-		{
-		} ;
-		template < typename T >
-		struct get_rule_head
-			: mpl::at < typename T::first , mpl::int_ < 0 > >
+			: tmp::integral < bool , false >
 		{
 		} ;
 		template < typename T , typename set >
 		struct eval_elem
-			: elem
+			: tmp::elem
 			<
 				typename T::type ,
 				typename set::type
@@ -462,407 +282,147 @@ namespace parser_combinator
 		} ;
 		template < typename T >
 		struct get_rule_body
-			: mpl::at < typename T::first , mpl::int_ < 1 > >
+			: tmp::at
+			<
+				typename tmp::at < T , tmp::integral < unsigned int , 0 > >::type ,
+				tmp::integral < unsigned int , 1 >
+			>
 		{
 		} ;
 		template < typename T , int N >
 		struct at_rule_body
-			: mpl::at < typename get_rule_body < T >::type , mpl::int_ < N > >
+			: tmp::at
+			<
+				typename get_rule_body < T >::type ,
+				tmp::integral < unsigned int , N >
+			>
 		{
 		} ;
 		template < typename LR0s >
 		struct get_top_rules_helper
-			: mpl::copy_if
+			: tmp::filter
 			<
-				LR0s ,
-				eval_is_top_rule < get_rule_head < mpl::_ > > ,
-				mpl::inserter < mpl::set < > , mpl::insert < mpl::_1 , mpl::_2 > >
+				eval_is_top_rule < tmp::arg < 0 > > ,
+				LR0s
 			>
 		{
 		} ;
 		template < typename T >
 		struct is_non_read
-			: std::is_same < typename at_rule_body < T , 0 >::type , current_read >
+			: tmp::equal < typename at_rule_body < T , 0 >::type , current_read >
 		{
 		} ;
 		template < typename LR0s >
 		struct get_top_rules
-			: mpl::copy_if
+			: tmp::list_to_set
 			<
-				typename get_top_rules_helper < LR0s >::type ,
-				is_non_read < mpl::_ > ,
-				mpl::inserter < mpl::set < > , mpl::insert < mpl::_1 , mpl::_2 > >
+				typename tmp::filter
+				<
+					is_non_read < tmp::arg < 0 > > ,
+					typename get_top_rules_helper
+					<
+						typename tmp::set_to_list < LR0s >::type
+					>::type
+				>::type
 			>
+		{
+		} ;
+		template < typename T >
+		struct get_next_read_helper ;
+		template < typename ... Ts >
+		struct get_next_read_helper < tmp::list < Ts ... > >
+			: get_next_read_helper < typename tmp::tail < tmp::list < Ts ... > >::type >
+		{
+		} ;
+		template < typename ... Ts >
+		struct get_next_read_helper < tmp::list < current_read , Ts ... > >
+			: tmp::head < tmp::list < Ts ... > >
 		{
 		} ;
 		template < typename T >
 		struct get_next_read
-			: mpl::deref
+			: get_next_read_helper < typename get_rule_body < T >::type >
+		{
+		} ;
+		template < typename T , typename seq >
+		struct not_elem
+			: tmp::not_
 			<
-				typename mpl::next
+				tmp::elem
 				<
-					typename mpl::find
+					T ,
+					seq
+				>
+			>
+		{
+		} ;
+		template < typename set , typename I , typename env >
+		struct new_LR0s
+			: tmp::filter
+			<
+				eval_elem
+				<
+					get_rule_head < tmp::arg < 0 > > ,
+					typename tmp::map
 					<
-						typename get_rule_body < T >::type ,
-						current_read
+						get_next_read < tmp::arg < 0 > > ,
+						typename tmp::filter
+						<
+							not_elem < tmp::arg < 0 > , set > ,
+							I
+						>::type
 					>::type
-				>::type
-			>
-		{
-		} ;
-		template < typename rules , typename env >
-		struct collect_rules_helper
-		{
-			using rules_ = typename map
-			<
-				rules ,
-				get_next_read < mpl::_ >
-			>::type ;
-			using interim_next_rules = typename mpl::copy_if
-			<
-				env ,
-				eval_elem < get_rule_head < mpl::_ > , mpl::identity < rules_ > > ,
-				back_inserter < mpl::vector < > >
-			>::type ;
-			using type = typename mpl::copy_if
-			<
-				interim_next_rules ,
-				is_non_read < mpl::_ > ,
-				back_inserter < mpl::vector < > >
-			>::type ;
-		} ;
-		template < typename rules , typename env >
-		struct collect_rules
-			: mpl::copy
-			<
-				typename collect_rules_helper
+				> ,
+				typename tmp::filter
 				<
-					rules ,
+					is_non_read < tmp::arg < 0 > > ,
 					env
-				>::type ,
-				mpl::inserter < mpl::set < > , mpl::insert < mpl::_1 , mpl::_2 > >
-			>
-		{
-		} ;
-		template < typename T1 , typename T2 >
-		struct is_not_include
-			: mpl::not_
-			<
-				typename elem
-				<
-					T1 ,
-					T2
 				>::type
 			>
 		{
 		} ;
-		template < typename newer , typename interim >
-		struct true_newer
-			: mpl::copy_if
+		template < typename set , typename I , typename env >
+		struct make_closure_helper
+			: tmp::eval_if
 			<
-				newer ,
-				is_not_include < mpl::_ , interim > ,
-				back_inserter < mpl::vector < > >
-			>
-		{
-		} ;
-		template < typename T >
-		struct newer_is_empty_helper ;
-		template < typename ... T >
-		struct newer_is_empty_helper < variadic_vector < T ... > >
-			: mpl::false_
-		{
-		} ;
-		template < >
-		struct newer_is_empty_helper < variadic_vector < > >
-			: mpl::true_
-		{
-		} ;
-		template < typename T >
-		struct newer_is_empty
-			: newer_is_empty_helper < typename to_variadic_vector < T >::type >
-		{
-		} ;
-		template < typename interim , typename newer , typename env >
-		struct make_closure ;
-		template < bool is_empty , typename interim , typename newer , typename env >
-		struct make_closure_helper ;
-		template < typename interim , typename newer , typename env >
-		struct make_closure_helper < true , interim , newer , env >
-		{
-			using type = interim ;
-		} ;
-		template < typename interim , typename newer , typename env >
-		struct make_closure_helper < false , interim , newer , env >
-			: make_closure
-			<
-				typename concat
+				tmp::equal
 				<
-					mpl::vector
+					typename tmp::list_to_set < set >::type ,
+					typename tmp::union_
 					<
-						interim ,
-						typename true_newer < newer , interim >::type
-					>
-				>::type ,
-				typename collect_rules
+						typename tmp::list_to_set < set >::type ,
+						typename tmp::list_to_set < I >::type
+					>::type
+				> ,
+				tmp::list_to_set < set > ,
+				make_closure_helper
 				<
-					typename true_newer < newer , interim >::type ,
+					typename tmp::set_to_list
+					<
+						typename tmp::union_
+						<
+							typename tmp::list_to_set < set >::type ,
+							typename tmp::list_to_set < I >::type
+						>::type
+					>::type ,
+					typename new_LR0s
+					<
+						set ,
+						I ,
+						env
+					>::type ,
 					env
-				>::type ,
-				env
+				>
 			>
 		{
 		} ;
-		template < typename interim , typename newer , typename env >
+		template < typename I , typename env >
 		struct make_closure
 			: make_closure_helper
 			<
-				newer_is_empty
-				<
-					typename true_newer < newer , interim >::type
-				>::type::value ,
-				interim ,
-				newer ,
-				env
-			>
-		{
-		} ;
-		template < typename i , typename X >
-		struct next_current_read
-			: std::is_same
-			<
-				typename mpl::deref
-				<
-					typename mpl::next
-					<
-						typename mpl::find
-						<
-							typename get_rule_body < i >::type ,
-							X
-						>::type
-					>::type
-				>::type ,
-				current_read
-			>
-		{
-		} ;
-		template < typename I , typename X >
-		struct make_goto_helper
-			: mpl::copy_if
-			<
-				I ,
-				next_current_read < mpl::_ , X > ,
-				back_inserter < mpl::vector < > >
-			>
-		{
-		} ;
-		template < typename I , typename X >
-		struct make_goto
-			: make_closure
-			<
-				mpl::vector < > ,
-				typename make_goto_helper
-				<
-					I ,
-					X
-				>::type ,
-				I
-			>
-		{
-		} ;
-		template < typename T1 , typename T2 >
-		struct eval_is_same
-			: std::is_same < typename T1::type , T2 >
-		{
-		} ;
-		template < typename a , typename env >
-		struct make_first ;
-		template < typename T , typename id_type , id_type id , typename env >
-		struct make_first < variadic_vector < terminal < T , id_type , id > > , env >
-		{
-			using type = mpl::set < terminal < T , id_type , id > > ;
-		} ;
-		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id , typename env >
-		struct make_first < variadic_vector < rule_type < T , id_type , id > > , env >
-			: mpl::copy
-			<
-				typename concat
-				<
-					typename map
-					<
-						typename map
-						<
-							typename map
-							<
-								typename mpl::copy_if
-								<
-									env ,
-									eval_is_same < get_rule_head < mpl::_ > , rule_type < T , id_type , id > > ,
-									back_inserter < mpl::vector < > >
-								>::type ,
-								get_rule_body < mpl::_ >
-							>::type ,
-							to_variadic_vector < mpl::_ >
-						>::type ,
-						make_first < mpl::_ , env >
-					>::type
-				>::type ,
-				mpl::inserter < mpl::set < > , mpl::insert < mpl::_1 , mpl::_2 > >
-			>
-		{
-		} ;
-		template < typename T_ , typename ... T , typename env >
-		struct make_first < variadic_vector < T_ , T ... > , env >
-			: mpl::copy
-			<
-				typename mpl::copy
-				<
-					typename make_first
-					<
-						variadic_vector < T_ > ,
-						env
-					>::type ,
-					back_inserter
-					<
-						typename make_first
-						<
-							variadic_vector < T ... > ,
-							env
-						>::type
-					>
-				>::type ,
-				mpl::inserter < mpl::set < > , mpl::insert < mpl::_1 , mpl::_2 > >
-			>
-		{
-		} ;
-		template < typename T , typename env >
-		struct make_follow ;
-		template < typename T , typename vec , typename env >
-		struct make_follow_helper ;
-		template < typename T , typename vec , typename env >
-		struct make_follow_element ;
-		template < bool is_end , typename T , typename iter1 , typename iter2 , typename env >
-		struct make_follow_element_helper ;
-		template < typename T , typename iter1 , typename iter2 , typename env >
-		struct make_follow_element_helper < true , T , iter1 , iter2 , env >
-			: make_follow
-			<
-				T ,
-				env
-			>
-		{
-		} ;
-		template < typename T , typename iter1 , typename iter2 , typename env >
-		struct make_follow_element_helper < false , T , iter1 , iter2 , env >
-			: make_first
-			<
-				typename to_variadic_vector_iter
-				<
-					iter1 ,
-					iter2
-				>::type ,
-				env
-			>
-		{
-		} ;
-		template < typename T , typename rule_type , typename env >
-		struct make_follow_element
-			: make_follow_element_helper
-			<
-				std::is_same
-				<
-					typename mpl::next
-					<
-						typename mpl::find
-						<
-							typename get_rule_body < rule_type >::type ,
-							T
-						>::type
-					>::type ,
-					typename mpl::end
-					<
-						typename get_rule_body < rule_type >::type
-					>::type
-				>::type::value ,
-				typename get_rule_head < rule_type >::type ,
-				typename mpl::next
-				<
-					typename mpl::find
-					<
-						typename get_rule_body < rule_type >::type ,
-						T
-					>::type
-				>::type ,
-				typename mpl::end
-				<
-					typename get_rule_body < rule_type >::type
-				>::type ,
-				env
-			>
-		{
-		} ;
-		template < typename T , typename vec , typename env >
-		struct make_follow_helper_helper
-			: concat
-			<
-				typename map
-				<
-					vec ,
-					make_follow_element < T , mpl::_ , env >
-				>::type
-			>
-		{
-		} ;
-		template < typename T , typename vec , typename env >
-		struct make_follow_helper
-			: mpl::insert
-			<
-				typename make_follow_helper_helper
-				<
-					T ,
-					vec ,
-					env
-				>::type ,
-				typename mpl::end
-				<
-					typename make_follow_helper_helper
-					<
-						T ,
-						vec ,
-						env
-					>::type
-				>::type ,
-				end_read
-			>
-		{
-		} ;
-		template < typename T , typename env >
-		struct make_follow
-			: make_follow_helper
-			<
-				T ,
-				typename mpl::copy_if
-				<
-					env ,
-					eval_elem < mpl::identity < T > , get_rule_body < mpl::_ > > ,
-					back_inserter < mpl::vector < > >
-				>::type ,
-				env
-			>
-		{
-		} ;
-		template < typename T >
-		struct get_top_rule
-			: get_rule_head
-			<
-				typename mpl::deref
-				<
-					typename mpl::find
-					<
-						T ,
-						eval_is_top_rule < get_rule_head < mpl::_ > >
-					>::type
-				>::type
+				tmp::list < > ,
+				typename tmp::set_to_list < I >::type ,
+				typename tmp::set_to_list < env >::type
 			>
 		{
 		} ;
@@ -880,18 +440,13 @@ namespace parser_combinator
 				rules_type_
 			>::type ;
 			using top_rules = typename get_top_rules < LRs >::type ;
-			using closure = typename make_closure
+			using closures = typename make_closure
 			<
 				top_rules ,
-				typename collect_rules
-				<
-					top_rules ,
-					LRs
-				>::type ,
 				LRs
 			>::type ;
 			rules_type_ rules_ ;
-			// typename mpl::print < typename to_variadic_vector < closure >::type >::type value ;
+			typename tmp::print < closures >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
