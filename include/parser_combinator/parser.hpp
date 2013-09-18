@@ -12,6 +12,7 @@
 #include"TMP/elem.hpp"
 #include"TMP/empty.hpp"
 #include"TMP/equal.hpp"
+#include"TMP/eval.hpp"
 #include"TMP/eval_if.hpp"
 #include"TMP/eval_if_c.hpp"
 #include"TMP/filter.hpp"
@@ -250,11 +251,6 @@ namespace parser_combinator
 		{
 		} ;
 		template < typename T >
-		struct eval_is_top_rule
-			: is_top_rule < typename get_rule_head < T >::type >
-		{
-		} ;
-		template < typename T >
 		struct is_not_terminal ;
 		template < typename T , typename id_type , id_type id >
 		struct is_not_terminal < top_rule < T , id_type , id > >
@@ -269,15 +265,6 @@ namespace parser_combinator
 		template < typename T , typename id_type , id_type id >
 		struct is_not_terminal < terminal < T , id_type , id > >
 			: tmp::integral < bool , false >
-		{
-		} ;
-		template < typename T , typename set >
-		struct eval_elem
-			: tmp::elem
-			<
-				typename T::type ,
-				typename set::type
-			>
 		{
 		} ;
 		template < typename T >
@@ -302,7 +289,7 @@ namespace parser_combinator
 		struct get_top_rules_helper
 			: tmp::filter
 			<
-				eval_is_top_rule < tmp::arg < 0 > > ,
+				tmp::eval < is_top_rule < get_rule_head < tmp::arg < 0 > > > > ,
 				LR0s
 			>
 		{
@@ -356,22 +343,53 @@ namespace parser_combinator
 			>
 		{
 		} ;
+		template < typename T >
+		struct is_read_end ;
+		template < typename T >
+		struct is_read_end_helper ;
+		template < typename T >
+		struct is_read_end
+			: is_read_end_helper < typename get_rule_body < T >::type >
+		{
+		} ;
+		template < typename T >
+		struct is_read_end_helper
+			: is_read_end_helper < typename tmp::tail < T >::type >
+		{
+		} ;
+		template < typename T >
+		struct is_read_end_helper < tmp::list < T > >
+			: tmp::integral < bool , false >
+		{
+		} ;
+		template <  >
+		struct is_read_end_helper < tmp::list < current_read > >
+			: tmp::integral < bool , true >
+		{
+		} ;
 		template < typename set , typename I , typename env >
 		struct new_LR0s
 			: tmp::filter
 			<
-				eval_elem
+				tmp::eval
 				<
-					get_rule_head < tmp::arg < 0 > > ,
-					typename tmp::map
+					tmp::elem
 					<
-						get_next_read < tmp::arg < 0 > > ,
-						typename tmp::filter
+						get_rule_head < tmp::arg < 0 > > ,
+						typename tmp::map
 						<
-							not_elem < tmp::arg < 0 > , set > ,
-							I
+							get_next_read < tmp::arg < 0 > > ,
+							typename tmp::filter
+							<
+								tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
+								typename tmp::filter
+								<
+									not_elem < tmp::arg < 0 > , set > ,
+									I
+								>::type
+							>::type
 						>::type
-					>::type
+					>
 				> ,
 				typename tmp::filter
 				<
@@ -426,6 +444,123 @@ namespace parser_combinator
 			>
 		{
 		} ;
+		template < typename T >
+		struct promote_reading ;
+		template < typename T >
+		struct promote_reading_helper ;
+		template < typename T >
+		struct promote_reading
+			: tmp::list
+			<
+				tmp::list
+				<
+					typename get_rule_head < T >::type ,
+					typename promote_reading_helper
+					<
+						typename get_rule_body < T >::type
+					>::type
+				> ,
+				typename tmp::at < T , tmp::integral < int , 1 > >::type
+			>
+		{
+		} ;
+		template < typename T >
+		struct promote_reading_helper
+			: tmp::cons
+			<
+				typename tmp::head < T >::type ,
+				typename promote_reading_helper
+				<
+					typename tmp::tail < T >::type
+				>::type
+			>
+		{
+		} ;
+		template < typename T , typename ... T_ >
+		struct promote_reading_helper < tmp::list < current_read , T , T_ ... > >
+			: tmp::list < T , current_read , T_ ... >
+		{
+		} ;
+		template < typename I , typename X , typename env >
+		struct make_goto
+			: make_closure
+			<
+				typename tmp::list_to_set
+				<
+					typename tmp::map
+					<
+						promote_reading < tmp::arg < 0 > > ,
+						typename tmp::filter
+						<
+							tmp::eval < tmp::equal < get_next_read < tmp::arg < 0 > > , tmp::id < X > > > ,
+							typename tmp::filter
+							<
+								tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
+								typename tmp::set_to_list < I >::type
+							>::type
+						>::type
+					>::type
+				>::type ,
+				env
+			>
+		{
+		} ;
+		template < typename Is , typename env >
+		struct make_closures ;
+		template < typename I , typename env >
+		struct make_closures_helper
+			: tmp::map
+			<
+				make_goto < I , tmp::arg < 0 > , env > ,
+				typename tmp::map
+				<
+					get_next_read < tmp::arg < 0 > > ,
+					typename tmp::filter
+					<
+						tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
+						typename tmp::set_to_list < I >::type
+					>::type
+				>::type
+			>
+		{
+		} ;
+		template < typename Is , typename env >
+		struct new_Is
+			: tmp::union_
+			<
+				typename tmp::list_to_set
+				<
+					typename tmp::concat
+					<
+						typename tmp::map
+						<
+							make_closures_helper < tmp::arg < 0 > , env > ,
+							typename tmp::set_to_list < Is >::type
+						>::type
+					>::type
+				>::type ,
+				Is
+			>
+		{
+		} ;
+		template < typename Is , typename env >
+		struct make_closures
+			: tmp::eval_if
+			<
+				tmp::equal
+				<
+					typename new_Is < Is , env >::type ,
+					Is
+				> ,
+				tmp::id < Is > ,
+				make_closures
+				<
+					typename new_Is < Is , env >::type ,
+					env
+				>
+			>
+		{
+		} ;
 		template < typename ... rules_type >
 		class parser
 		{
@@ -440,13 +575,13 @@ namespace parser_combinator
 				rules_type_
 			>::type ;
 			using top_rules = typename get_top_rules < LRs >::type ;
-			using closures = typename make_closure
+			using closures = typename make_closures
 			<
-				top_rules ,
+				tmp::set < typename make_closure < top_rules , LRs >::type > ,
 				LRs
 			>::type ;
 			rules_type_ rules_ ;
-			typename tmp::print < closures >::type value ;
+			//typename tmp::print < closures >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
