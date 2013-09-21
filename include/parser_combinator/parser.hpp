@@ -48,6 +48,13 @@ namespace parser_combinator
 {
 	namespace parser
 	{
+		namespace detail
+		{
+			enum class internal_id_type
+			{
+				internal_id
+			} ;
+		}
 		struct current_read
 		{
 			using type = current_read ;
@@ -55,6 +62,20 @@ namespace parser_combinator
 		struct end_read
 		{
 			using type = end_read ;
+		} ;
+		template < typename tuple >
+		struct tuple_to_list ;
+		template < typename list >
+		struct list_to_tuple ;
+		template < typename ... tuple >
+		struct tuple_to_list < std::tuple < tuple ... > >
+		{
+			using type = tmp::list < tuple ... > ;
+		} ;
+		template < typename ... list >
+		struct list_to_tuple < tmp::list < list ... > >
+		{
+			using type = std::tuple < list ... > ;
 		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct assign_result ;
@@ -131,7 +152,7 @@ namespace parser_combinator
 		} ;
 		template < int index , typename ... type_in_tuple , typename args_head , typename ... args_type >
 		struct make_rules < index , std::tuple < type_in_tuple ... > , args_head , args_type ... >
-			: make_rules < index + 1 , std::tuple < type_in_tuple ... , first_only_tuple < args_head , tmp::integral < unsigned int , index > > > , args_type ... >
+			: make_rules < index + 1 , std::tuple < type_in_tuple ... , first_only_tuple < args_head , tmp::integral < int , index > > > , args_type ... >
 		{
 		} ;
 		template < typename T >
@@ -190,13 +211,15 @@ namespace parser_combinator
 		} ;
 		template < typename T >
 		struct make_LR0 ;
+		template < typename T >
+		struct make_LR0_helper ;
 		template < >
-		struct make_LR0 < std::tuple < > >
+		struct make_LR0_helper < std::tuple < > >
 		{
 			using type = tmp::set < > ;
 		} ;
 		template < typename lhs_type , typename rhs_type >
-		struct make_LR0 < assign_result < lhs_type , rhs_type > >
+		struct make_LR0_helper < assign_result < lhs_type , rhs_type > >
 			: tmp::list_to_set
 			<
 				typename assign_to_list
@@ -207,29 +230,38 @@ namespace parser_combinator
 		{
 		} ;
 		template < typename T1 , typename T2 >
-		struct make_LR0 < first_only_tuple < T1 , T2 > >
+		struct make_LR0_helper < first_only_tuple < T1 , T2 > >
 			: tmp::map
 			<
 				tmp::list < tmp::arg < 0 > , T2 > ,
-				typename tmp::set_to_list < typename make_LR0 < T1 >::type >::type
+				typename tmp::set_to_list < typename make_LR0_helper < T1 >::type >::type
 			>
 		{
 		} ;
 		template < typename T1 , typename ... T_ >
-		struct make_LR0 < std::tuple < T1 , T_ ... > >
+		struct make_LR0_helper < std::tuple < T1 , T_ ... > >
 			: tmp::list_to_set
 			<
 				typename tmp::concat
 				<
 					tmp::list
 					<
-						typename make_LR0 < T1 >::type ,
+						typename make_LR0_helper < T1 >::type ,
 						typename tmp::set_to_list
 						<
-							typename make_LR0 < std::tuple < T_ ... > >::type
+							typename make_LR0_helper < std::tuple < T_ ... > >::type
 						>::type
 					>
 				>::type
+			>
+		{
+		} ;
+		template < typename T >
+		struct get_rule_head
+			: tmp::at
+			<
+				typename tmp::at < T , tmp::integral < unsigned int , 0 > >::type ,
+				tmp::integral < unsigned int , 0 >
 			>
 		{
 		} ;
@@ -243,30 +275,13 @@ namespace parser_combinator
 			: tmp::integral < bool , true >
 		{
 		} ;
-		template < typename T >
-		struct get_rule_head
-			: tmp::at
+		template < typename LR0s >
+		struct get_top_rules_helper
+			: tmp::filter
 			<
-				typename tmp::at < T , tmp::integral < unsigned int , 0 > >::type ,
-				tmp::integral < unsigned int , 0 >
+				tmp::eval < is_top_rule < get_rule_head < tmp::arg < 0 > > > > ,
+				LR0s
 			>
-		{
-		} ;
-		template < typename T >
-		struct is_not_terminal ;
-		template < typename T , typename id_type , id_type id >
-		struct is_not_terminal < top_rule < T , id_type , id > >
-			: tmp::integral < bool , true >
-		{
-		} ;
-		template < typename T , typename id_type , id_type id >
-		struct is_not_terminal < rule < T , id_type , id > >
-			: tmp::integral < bool , true >
-		{
-		} ;
-		template < typename T , typename id_type , id_type id >
-		struct is_not_terminal < terminal < T , id_type , id > >
-			: tmp::integral < bool , false >
 		{
 		} ;
 		template < typename T >
@@ -284,15 +299,6 @@ namespace parser_combinator
 			<
 				typename get_rule_body < T >::type ,
 				tmp::integral < unsigned int , N >
-			>
-		{
-		} ;
-		template < typename LR0s >
-		struct get_top_rules_helper
-			: tmp::filter
-			<
-				tmp::eval < is_top_rule < get_rule_head < tmp::arg < 0 > > > > ,
-				LR0s
 			>
 		{
 		} ;
@@ -314,6 +320,154 @@ namespace parser_combinator
 					>::type
 				>::type
 			>
+		{
+		} ;
+		template < typename T >
+		struct get_top_rule
+			: tmp::head
+			<
+				typename tmp::map
+				<
+					get_rule_head < tmp::arg < 0 > > ,
+					typename tmp::set_to_list
+					<
+						typename get_top_rules
+						<
+							typename make_LR0_helper < T >::type
+						>::type
+					>::type
+				>::type
+			>
+		{
+			static_assert
+			(
+				tmp::size <
+					typename tmp::unique
+					<
+						typename tmp::map
+						<
+							get_rule_head < tmp::arg < 0 > > ,
+							typename tmp::set_to_list
+							<
+								typename get_top_rules
+								<
+									typename make_LR0_helper < T >::type
+								>::type
+							>::type
+						>::type
+					>::type
+				>::type::value == 1 ,
+				""
+			) ;
+		} ;
+		template < typename rule >
+		struct rule_normalize ;
+		template < typename rule >
+		struct rule_normalize_element ;
+		template < typename rule , typename index >
+		struct rule_normalize < tmp::list < rule , index > >
+			: tmp::list
+			<
+				tmp::list
+				<
+					typename rule_normalize_element
+					<
+						typename get_rule_head
+						<
+							tmp::list < rule , index >
+						>::type
+					>::type ,
+					typename tmp::map
+					<
+						rule_normalize_element < tmp::arg < 0 > > ,
+						typename get_rule_body
+						<
+							tmp::list < rule , index >
+						>::type
+					>::type
+				> ,
+				index
+			>
+		{
+		} ;
+		template < typename T >
+		struct rule_normalize_element
+		{
+			using type = T ;
+		} ;
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
+		struct rule_normalize_element < rule_type < T , id_type , id > >
+			: rule < T , id_type , id >
+		{
+		} ;
+		template < typename T , typename id_type , id_type id >
+		struct rule_normalize_element < terminal < T , id_type , id > >
+			: terminal < T , id_type , id >
+		{
+		} ;
+		template < typename T >
+		struct make_LR0
+			: tmp::list_to_set
+			<
+				typename tmp::concat
+				<
+					tmp::list
+					<
+						typename tmp::map
+						<
+							tmp::list
+							<
+								tmp::arg < 0 > ,
+								tmp::integral < int , 0 >
+							> ,
+							typename assign_to_list
+							<
+								assign_result
+								<
+									top_rule
+									<
+										typename get_value_type
+										<
+											typename get_top_rule < T >::type
+										>::type ,
+										detail::internal_id_type ,
+										detail::internal_id_type::internal_id
+									> ,
+									typename rule_normalize_element
+									<
+										typename get_top_rule < T >::type
+									>::type
+								>
+							>::type
+						>::type ,
+						typename tmp::map
+						<
+							rule_normalize < tmp::arg < 0 > > ,
+							typename tmp::set_to_list
+							<
+								typename make_LR0_helper < T >::type
+							>::type
+						>::type
+					>
+				>::type
+			>
+		{
+		} ;
+		template < typename T >
+		struct is_not_terminal ;
+		template < typename T , typename id_type , id_type id >
+		struct is_not_terminal < top_rule < T , id_type , id > >
+			: tmp::integral < bool , true >
+		{
+		} ;
+		template < typename T , typename id_type , id_type id >
+		struct is_not_terminal < rule < T , id_type , id > >
+			: tmp::integral < bool , true >
+		{
+		} ;
+		template < typename T , typename id_type , id_type id >
+		struct is_not_terminal < terminal < T , id_type , id > >
+			: tmp::integral < bool , false >
 		{
 		} ;
 		template < typename T >
@@ -730,7 +884,7 @@ namespace parser_combinator
 		{
 			using rules_type_ = typename make_rules
 			<
-				0 ,
+				1 ,
 				std::tuple < > ,
 				rules_type ...
 			>::type ;
@@ -767,18 +921,8 @@ namespace parser_combinator
 			: assign_to_function < lhs_type , result_type , typename get_value_type < rhs_type >::type , args_type ... >
 		{
 		} ;
-		template < typename T , typename id_type , id_type id >
-		struct get_value_type < top_rule < T , id_type , id > >
-		{
-			using type = T ;
-		} ;
-		template < typename T , typename id_type , id_type id >
-		struct get_value_type < rule < T , id_type , id > >
-		{
-			using type = T ;
-		} ;
-		template < typename T , typename id_type , id_type id >
-		struct get_value_type < terminal < T , id_type , id > >
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
+		struct get_value_type < rule_type < T , id_type , id > >
 		{
 			using type = T ;
 		} ;
