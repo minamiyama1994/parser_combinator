@@ -455,13 +455,8 @@ namespace parser_combinator
 		} ;
 		template < typename T >
 		struct is_not_terminal ;
-		template < typename T , typename id_type , id_type id >
-		struct is_not_terminal < top_rule < T , id_type , id > >
-			: tmp::integral < bool , true >
-		{
-		} ;
-		template < typename T , typename id_type , id_type id >
-		struct is_not_terminal < rule < T , id_type , id > >
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
+		struct is_not_terminal < rule_type < T , id_type , id > >
 			: tmp::integral < bool , true >
 		{
 		} ;
