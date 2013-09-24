@@ -1,5 +1,7 @@
 #ifndef PARSER_COMBINATOR_PARSER_HPP
 #define PARSER_COMBINATOR_PARSER_HPP
+#include<functional>
+#include<tuple>
 #include"TMP/all.hpp"
 #include"TMP/and.hpp"
 #include"TMP/any.hpp"
@@ -621,19 +623,16 @@ namespace parser_combinator
 		struct make_goto
 			: make_closure
 			<
-				typename tmp::list_to_set
+				typename tmp::map
 				<
-					typename tmp::map
+					promote_reading < tmp::arg < 0 > > ,
+					typename tmp::filter
 					<
-						promote_reading < tmp::arg < 0 > > ,
+						tmp::eval < tmp::equal < get_next_read < tmp::arg < 0 > > , tmp::id < X > > > ,
 						typename tmp::filter
 						<
-							tmp::eval < tmp::equal < get_next_read < tmp::arg < 0 > > , tmp::id < X > > > ,
-							typename tmp::filter
-							<
-								tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
-								typename tmp::set_to_list < I >::type
-							>::type
+							tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
+							I
 						>::type
 					>::type
 				>::type ,
@@ -894,7 +893,7 @@ namespace parser_combinator
 				LRs
 			>::type ;
 			rules_type_ rules_ ;
-			typename tmp::print < closures >::type value ;
+			//typename tmp::print < closures >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
