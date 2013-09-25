@@ -11,6 +11,8 @@
 #include"TMP/composite.hpp"
 #include"TMP/concat.hpp"
 #include"TMP/cons.hpp"
+#include"TMP/delete.hpp"
+#include"TMP/dict.hpp"
 #include"TMP/elem.hpp"
 #include"TMP/empty.hpp"
 #include"TMP/equal.hpp"
@@ -18,6 +20,7 @@
 #include"TMP/eval_if.hpp"
 #include"TMP/eval_if_c.hpp"
 #include"TMP/filter.hpp"
+#include"TMP/find.hpp"
 #include"TMP/foldl.hpp"
 #include"TMP/foldr.hpp"
 #include"TMP/head.hpp"
@@ -26,22 +29,25 @@
 #include"TMP/if_c.hpp"
 #include"TMP/init.hpp"
 #include"TMP/insert.hpp"
+#include"TMP/insert_dict.hpp"
 #include"TMP/integral.hpp"
 #include"TMP/intersection.hpp"
 #include"TMP/lambda.hpp"
 #include"TMP/last.hpp"
 #include"TMP/list.hpp"
-#include"TMP/list_to_set.hpp"
+#include"TMP/lookup.hpp"
 #include"TMP/map.hpp"
 #include"TMP/nand.hpp"
 #include"TMP/not.hpp"
 #include"TMP/or.hpp"
 #include"TMP/print.hpp"
 #include"TMP/set.hpp"
-#include"TMP/set_to_list.hpp"
 #include"TMP/size.hpp"
 #include"TMP/symmetric_difference.hpp"
 #include"TMP/tail.hpp"
+#include"TMP/to_dict.hpp"
+#include"TMP/to_list.hpp"
+#include"TMP/to_set.hpp"
 #include"TMP/union.hpp"
 #include"TMP/unique.hpp"
 #include"TMP/xor.hpp"
@@ -68,14 +74,14 @@ namespace parser_combinator
 		template < typename tuple >
 		struct tuple_to_list ;
 		template < typename list >
-		struct list_to_tuple ;
+		struct to_tuple ;
 		template < typename ... tuple >
 		struct tuple_to_list < std::tuple < tuple ... > >
 		{
 			using type = tmp::list < tuple ... > ;
 		} ;
 		template < typename ... list >
-		struct list_to_tuple < tmp::list < list ... > >
+		struct to_tuple < tmp::list < list ... > >
 		{
 			using type = std::tuple < list ... > ;
 		} ;
@@ -177,13 +183,13 @@ namespace parser_combinator
 		{
 		} ;
 		template < typename T1 , typename T2 >
-		struct list_to_LR0 ;
+		struct to_LR0 ;
 		template < typename ... T1 , typename T2 , typename  ... T2s >
-		struct list_to_LR0 < tmp::list < T1 ... > , tmp::list < T2 , T2s ... > >
+		struct to_LR0 < tmp::list < T1 ... > , tmp::list < T2 , T2s ... > >
 			: tmp::cons
 			<
 				tmp::list < T1 ... , current_read , T2 , T2s ... > ,
-				typename list_to_LR0
+				typename to_LR0
 				<
 					tmp::list < T1 ... , T2 > ,
 					tmp::list < T2s ... >
@@ -192,7 +198,7 @@ namespace parser_combinator
 		{
 		} ;
 		template < typename ... T1 >
-		struct list_to_LR0 < tmp::list < T1 ... > , tmp::list < > >
+		struct to_LR0 < tmp::list < T1 ... > , tmp::list < > >
 			: tmp::list < tmp::list < T1 ... , current_read > >
 		{
 		} ;
@@ -203,7 +209,7 @@ namespace parser_combinator
 			: tmp::map
 			<
 				tmp::list < lhs_type , tmp::arg < 0 > > ,
-				typename list_to_LR0
+				typename to_LR0
 				<
 					tmp::list < > ,
 					typename shift_to_list < rhs_type >::type
@@ -222,7 +228,7 @@ namespace parser_combinator
 		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct make_LR0_helper < assign_result < lhs_type , rhs_type > >
-			: tmp::list_to_set
+			: tmp::to_set
 			<
 				typename assign_to_list
 				<
@@ -236,20 +242,20 @@ namespace parser_combinator
 			: tmp::map
 			<
 				tmp::list < tmp::arg < 0 > , T2 > ,
-				typename tmp::set_to_list < typename make_LR0_helper < T1 >::type >::type
+				typename tmp::to_list < typename make_LR0_helper < T1 >::type >::type
 			>
 		{
 		} ;
 		template < typename T1 , typename ... T_ >
 		struct make_LR0_helper < std::tuple < T1 , T_ ... > >
-			: tmp::list_to_set
+			: tmp::to_set
 			<
 				typename tmp::concat
 				<
 					tmp::list
 					<
 						typename make_LR0_helper < T1 >::type ,
-						typename tmp::set_to_list
+						typename tmp::to_list
 						<
 							typename make_LR0_helper < std::tuple < T_ ... > >::type
 						>::type
@@ -311,14 +317,14 @@ namespace parser_combinator
 		} ;
 		template < typename LR0s >
 		struct get_top_rules
-			: tmp::list_to_set
+			: tmp::to_set
 			<
 				typename tmp::filter
 				<
 					is_non_read < tmp::arg < 0 > > ,
 					typename get_top_rules_helper
 					<
-						typename tmp::set_to_list < LR0s >::type
+						typename tmp::to_list < LR0s >::type
 					>::type
 				>::type
 			>
@@ -331,7 +337,7 @@ namespace parser_combinator
 				typename tmp::map
 				<
 					get_rule_head < tmp::arg < 0 > > ,
-					typename tmp::set_to_list
+					typename tmp::to_list
 					<
 						typename get_top_rules
 						<
@@ -349,7 +355,7 @@ namespace parser_combinator
 						typename tmp::map
 						<
 							get_rule_head < tmp::arg < 0 > > ,
-							typename tmp::set_to_list
+							typename tmp::to_list
 							<
 								typename get_top_rules
 								<
@@ -409,7 +415,7 @@ namespace parser_combinator
 		} ;
 		template < typename T >
 		struct make_LR0
-			: tmp::list_to_set
+			: tmp::to_set
 			<
 				typename tmp::concat
 				<
@@ -445,7 +451,7 @@ namespace parser_combinator
 						typename tmp::map
 						<
 							rule_normalize < tmp::arg < 0 > > ,
-							typename tmp::set_to_list
+							typename tmp::to_list
 							<
 								typename make_LR0_helper < T >::type
 							>::type
@@ -543,22 +549,22 @@ namespace parser_combinator
 			<
 				tmp::equal
 				<
-					typename tmp::list_to_set < set >::type ,
+					typename tmp::to_set < set >::type ,
 					typename tmp::union_
 					<
-						typename tmp::list_to_set < set >::type ,
-						typename tmp::list_to_set < I >::type
+						typename tmp::to_set < set >::type ,
+						typename tmp::to_set < I >::type
 					>::type
 				> ,
-				tmp::list_to_set < set > ,
+				tmp::to_set < set > ,
 				make_closure_helper
 				<
-					typename tmp::set_to_list
+					typename tmp::to_list
 					<
 						typename tmp::union_
 						<
-							typename tmp::list_to_set < set >::type ,
-							typename tmp::list_to_set < I >::type
+							typename tmp::to_set < set >::type ,
+							typename tmp::to_set < I >::type
 						>::type
 					>::type ,
 					typename new_LR0s
@@ -577,8 +583,8 @@ namespace parser_combinator
 			: make_closure_helper
 			<
 				tmp::list < > ,
-				typename tmp::set_to_list < I >::type ,
-				typename tmp::set_to_list < env >::type
+				typename tmp::to_list < I >::type ,
+				typename tmp::to_list < env >::type
 			>
 		{
 		} ;
@@ -653,7 +659,7 @@ namespace parser_combinator
 					typename tmp::filter
 					<
 						tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
-						typename tmp::set_to_list < I >::type
+						typename tmp::to_list < I >::type
 					>::type
 				>::type
 			>
@@ -663,14 +669,14 @@ namespace parser_combinator
 		struct new_Is
 			: tmp::union_
 			<
-				typename tmp::list_to_set
+				typename tmp::to_set
 				<
 					typename tmp::concat
 					<
 						typename tmp::map
 						<
 							make_closures_helper < tmp::arg < 0 > , env > ,
-							typename tmp::set_to_list < Is >::type
+							typename tmp::to_list < Is >::type
 						>::type
 					>::type
 				>::type ,
@@ -727,7 +733,7 @@ namespace parser_combinator
 		} ;
 		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id , typename env >
 		struct make_first_helper < tmp::list < rule_type < T , id_type , id > > , env >
-			: tmp::list_to_set
+			: tmp::to_set
 			<
 				typename tmp::concat
 				<
@@ -735,7 +741,7 @@ namespace parser_combinator
 					<
 						tmp::eval
 						<
-							tmp::set_to_list
+							tmp::to_list
 							<
 								tmp::eval
 								<
@@ -783,7 +789,7 @@ namespace parser_combinator
 					typename tmp::map
 					<
 						remove_current_read < tmp::arg < 0 > > ,
-						typename tmp::set_to_list < env >::type
+						typename tmp::to_list < env >::type
 					>::type
 				>::type
 			>
@@ -836,13 +842,13 @@ namespace parser_combinator
 		} ;
 		template < typename A , typename env >
 		struct make_follow_helper
-			: tmp::list_to_set
+			: tmp::to_set
 			<
 				typename tmp::concat
 				<
 					typename tmp::map
 					<
-						tmp::set_to_list < tmp::arg < 0 > > ,
+						tmp::to_list < tmp::arg < 0 > > ,
 						typename tmp::map
 						<
 							iterate_make_follow_wrapper < A , tmp::arg < 0 > , env > ,
@@ -865,7 +871,7 @@ namespace parser_combinator
 						typename tmp::map
 						<
 							remove_current_read < tmp::arg < 0 > > ,
-							typename tmp::set_to_list < env >::type
+							typename tmp::to_list < env >::type
 						>::type
 					>::type
 				>::type ,
