@@ -48,6 +48,7 @@
 #include"TMP/to_dict.hpp"
 #include"TMP/to_list.hpp"
 #include"TMP/to_set.hpp"
+#include"TMP/typed_map.hpp"
 #include"TMP/union.hpp"
 #include"TMP/unique.hpp"
 #include"TMP/xor.hpp"
@@ -154,13 +155,13 @@ namespace parser_combinator
 		template < int index , typename type_tuple , typename ... args_type >
 		struct make_rules ;
 		template < int index , typename ... type_in_tuple >
-		struct make_rules < index , std::tuple < type_in_tuple ... > >
+		struct make_rules < index , tmp::list < type_in_tuple ... > >
 		{
 			using type = std::tuple < type_in_tuple ... > ;
 		} ;
 		template < int index , typename ... type_in_tuple , typename args_head , typename ... args_type >
-		struct make_rules < index , std::tuple < type_in_tuple ... > , args_head , args_type ... >
-			: make_rules < index + 1 , std::tuple < type_in_tuple ... , first_only_tuple < args_head , tmp::integral < int , index > > > , args_type ... >
+		struct make_rules < index , tmp::list < type_in_tuple ... > , args_head , args_type ... >
+			: make_rules < index + 1 , tmp::list < type_in_tuple ... , first_only_tuple < args_head , tmp::integral < int , index > > > , args_type ... >
 		{
 		} ;
 		template < typename T >
@@ -879,13 +880,34 @@ namespace parser_combinator
 			>
 		{
 		} ;
+		template < int index , typename list >
+		struct numbering ;
+		template < int index , typename list >
+		struct numbering
+			: tmp::insert_dict
+			<
+				typename tmp::head < list >::type ,
+				tmp::integral < int , index > ,
+				typename numbering
+				<
+					index + 1 ,
+					typename tmp::tail < list >::type
+				>::type
+			>
+		{
+		} ;
+		template < int index >
+		struct numbering < index , tmp::list < > >
+			: tmp::dict < >
+		{
+		} ;
 		template < typename ... rules_type >
 		class parser
 		{
 			using rules_type_ = typename make_rules
 			<
 				1 ,
-				std::tuple < > ,
+				tmp::list < > ,
 				rules_type ...
 			>::type ;
 			using LRs = typename make_LR0
@@ -898,8 +920,13 @@ namespace parser_combinator
 				tmp::set < typename make_closure < top_rules , LRs >::type > ,
 				LRs
 			>::type ;
+			using numbered_closures = typename numbering
+			<
+				0 ,
+				typename tmp::to_list < closures >::type
+			>::type ;
 			rules_type_ rules_ ;
-			//typename tmp::print < closures >::type value ;
+			//typename tmp::print < numbered_closures >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
@@ -915,7 +942,10 @@ namespace parser_combinator
 		struct assign_to_function
 		{
 			using type = std::function < result_type ( const typename get_value_type < rule_type >::type & , const args_type & ... ) > ;
+			static type value ;
 		} ;
+		template < typename rule_type , typename result_type , typename ... args_type >
+		typename assign_to_function < rule_type , result_type , args_type ... >::type assign_to_function < rule_type , result_type , args_type ... >::value = [ ] ( const typename get_value_type < rule_type >::type & arg0 , const args_type & ... args ) { return result_type { arg0 , args ... } ; } ;
 		template < typename lhs_type , typename rhs_type , typename result_type , typename ... args_type >
 		struct assign_to_function < shift_result < lhs_type , rhs_type > , result_type , args_type ... >
 			: assign_to_function < lhs_type , result_type , typename get_value_type < rhs_type >::type , args_type ... >
@@ -932,14 +962,18 @@ namespace parser_combinator
 		struct assign_result < top_rule < T , id_type , id > , rhs_type >
 		{
 			using type = assign_result ;
-			typename assign_to_function < rhs_type , T >::type value { } ;
+			static typename assign_to_function < rhs_type , T >::type value ;
 		} ;
 		template < typename T , typename id_type , id_type id , typename rhs_type >
 		struct assign_result < rule < T , id_type , id > , rhs_type >
 		{
 			using type = assign_result ;
-			typename assign_to_function < rhs_type , T >::type value { } ;
+			static typename assign_to_function < rhs_type , T >::type value ;
 		} ;
+		template < typename T , typename id_type , id_type id , typename rhs_type >
+		typename assign_to_function < rhs_type , T >::type assign_result < top_rule < T , id_type , id > , rhs_type >::value { assign_to_function < rhs_type , T >::value } ;
+		template < typename T , typename id_type , id_type id , typename rhs_type >
+		typename assign_to_function < rhs_type , T >::type assign_result < rule < T , id_type , id > , rhs_type >::value { assign_to_function < rhs_type , T >::value } ;
 		template < typename lhs_lhs_type , typename lhs_rhs_type , typename rhs_type >
 		struct shift_result < assign_result < lhs_lhs_type , lhs_rhs_type > , rhs_type > ;
 		template < typename lhs_type , typename rhs_lhs_type , typename rhs_rhs_type >
