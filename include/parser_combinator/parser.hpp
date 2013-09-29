@@ -972,8 +972,18 @@ namespace parser_combinator
 			<
 				typename tmp::to_list < LRs >::type
 			>::type ;
+			using terminals = typename tmp::filter
+			<
+				tmp::not_ < is_not_terminal < tmp::arg < 0 > > > ,
+				types_list
+			>::type ;
+			using non_terminals = typename tmp::filter
+			<
+				is_not_terminal < tmp::arg < 0 > > ,
+				types_list
+			>::type ;
 			rules_type_ rules_ ;
-			//typename tmp::print < types_list >::type value ;
+			//typename tmp::print < tmp::list < terminals , non_terminals > >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
