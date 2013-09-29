@@ -809,14 +809,14 @@ namespace parser_combinator
 		struct iterate_make_follow < A , head , tmp::list < A , body ... > , env >
 			: tmp::union_
 			<
+				typename make_first < tmp::list < body ... > , env >::type ,
 				typename iterate_make_follow
 				<
 					A ,
 					head ,
 					tmp::list < body ... > ,
 					env
-				>::type ,
-				typename make_first < tmp::list < body ... > , env >::type
+				>::type
 			>
 		{
 		} ;
@@ -901,6 +901,49 @@ namespace parser_combinator
 			: tmp::dict < >
 		{
 		} ;
+		template < typename T >
+		struct collect_cmponent ;
+		template < typename ... T >
+		struct collect_cmponent < tmp::list < T ... > >
+			: tmp::foldl
+			<
+				tmp::eval
+				<
+					tmp::union_
+					<
+						tmp::id < tmp::arg < 0 > > ,
+						collect_cmponent < tmp::arg < 1 > >
+					>
+				> ,
+				tmp::set < > ,
+				tmp::list < T ... >
+			>
+		{
+		} ;
+		template < typename T1 , typename T2 >
+		struct collect_cmponent < first_only_tuple < T1 , T2 > >
+			: collect_cmponent < T1 >
+		{
+		} ;
+		template < typename T , typename ... T_ , typename int_type >
+		struct collect_cmponent < tmp::list < tmp::list < T , tmp::list < T_ ... > > , int_type > >
+			: tmp::insert
+			<
+				typename collect_cmponent < tmp::list < T_ ... > >::type ,
+				T
+			>
+		{
+		} ;
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
+		struct collect_cmponent < rule_type < T , id_type , id > >
+			: tmp::set < rule_type < T , id_type , id > >
+		{
+		} ;
+		template < >
+		struct collect_cmponent < current_read >
+			: tmp::set < >
+		{
+		} ;
 		template < typename ... rules_type >
 		class parser
 		{
@@ -925,8 +968,12 @@ namespace parser_combinator
 				0 ,
 				typename tmp::to_list < closures >::type
 			>::type ;
+			using types_list = typename collect_cmponent
+			<
+				typename tmp::to_list < LRs >::type
+			>::type ;
 			rules_type_ rules_ ;
-			//typename tmp::print < numbered_closures >::type value ;
+			//typename tmp::print < types_list >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
