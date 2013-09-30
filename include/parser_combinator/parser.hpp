@@ -53,17 +53,39 @@
 #include"TMP/unique.hpp"
 #include"TMP/xor.hpp"
 #include"TMP/zip.hpp"
+#define PARSER_COMBINATOR_PARSER_DECL_COMPONENT_ID(...) \
+namespace parser_combinator \
+{ \
+	namespace parser \
+	{ \
+		template < > \
+		struct decl_component_id < parser_combinator::parser::detail::internal_id_tag < void >::type > \
+		{ \
+			enum class id_type \
+			{ \
+				parser_combinator_parser_decl_component_id_id_type_begin , \
+				__VA_ARGS__ , \
+				parser_combinator_parser_decl_component_id_id_type_end \
+			} ; \
+		} ; \
+	} \
+}
+#define COMPONENT_ID_IMPL(t,name) typename parser_combinator::parser::decl_component_id < typename parser_combinator::parser::detail::internal_id_tag < t >::type >::id_type , parser_combinator::parser::decl_component_id < typename parser_combinator::parser::detail::internal_id_tag < t >::type >::id_type::name
+#define COMPONENT_ID(name) COMPONENT_ID_IMPL ( void , name )
 namespace parser_combinator
 {
 	namespace parser
 	{
 		namespace detail
 		{
-			enum class internal_id_type
+			template < typename T >
+			struct internal_id_tag
 			{
-				internal_id
+				using type = void ;
 			} ;
 		}
+		template < typename T >
+		struct decl_component_id ;
 		struct current_read
 		{
 			using type = current_read ;
@@ -439,8 +461,11 @@ namespace parser_combinator
 										<
 											typename get_top_rule < T >::type
 										>::type ,
-										detail::internal_id_type ,
-										detail::internal_id_type::internal_id
+										COMPONENT_ID_IMPL
+										(
+											T ,
+											parser_combinator_parser_decl_component_id_id_type_begin
+										)
 									> ,
 									typename rule_normalize_element
 									<
