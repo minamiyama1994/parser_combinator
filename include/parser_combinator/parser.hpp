@@ -969,6 +969,67 @@ namespace parser_combinator
 			: tmp::set < >
 		{
 		} ;
+		template < typename T >
+		struct get_id ;
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
+		struct get_id < rule_type < T , id_type , id > >
+			: tmp::integral < id_type , id >
+		{
+		} ;
+		template < typename I , typename components , typename Is , typename env >
+		struct make_goto_table_line
+			: tmp::foldr
+			<
+				tmp::eval
+				<
+					tmp::insert_dict
+					<
+						get_id < tmp::arg < 0 > > ,
+						tmp::eval
+						<
+							tmp::lookup
+							<
+								make_goto < I , tmp::arg < 0 > , env > ,
+								tmp::id < Is >
+							>
+						> ,
+						tmp::id < tmp::arg < 1 > >
+					>
+				> ,
+				tmp::dict < > ,
+				typename tmp::to_list < components >::type
+			>
+		{
+		} ;
+		template < typename components , typename Is , typename env >
+		struct make_goto_table
+			: tmp::foldr
+			<
+				tmp::eval
+				<
+					tmp::insert_dict
+					<
+						tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
+						tmp::eval
+						<
+							make_goto_table_line
+							<
+								tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
+								tmp::id < components > ,
+								tmp::id < Is > ,
+								tmp::id < env >
+							>
+						> ,
+						tmp::id < tmp::arg < 1 > >
+					>
+				> ,
+				tmp::dict < > ,
+				typename tmp::to_list < Is > ::type
+			>
+		{
+		} ;
+		template < typename I , typename terminals , typename Is , typename env >
+		struct make_action_table ;
 		template < typename ... rules_type >
 		class parser
 		{
@@ -1008,7 +1069,18 @@ namespace parser_combinator
 				types_list
 			>::type ;
 			rules_type_ rules_ ;
-			//typename tmp::print < tmp::list < terminals , non_terminals > >::type value ;
+			using goto_table = typename make_goto_table
+			<
+				non_terminals ,
+				typename tmp::insert_dict
+				<
+					tmp::set < > ,
+					tmp::integral < int , - 1 > ,
+					numbered_closures
+				>::type ,
+				LRs
+			>::type ;
+			//typename tmp::print < goto_table >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
