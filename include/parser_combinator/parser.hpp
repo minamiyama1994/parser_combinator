@@ -84,38 +84,10 @@ namespace parser_combinator
 				using type = void ;
 			} ;
 		}
-		template < typename T >
-		struct decl_component_id ;
-		struct current_read
-		{
-			using type = current_read ;
-		} ;
-		struct end_read
-		{
-			using type = end_read ;
-		} ;
-		template < typename tuple >
-		struct tuple_to_list ;
-		template < typename list >
-		struct to_tuple ;
-		template < typename ... tuple >
-		struct tuple_to_list < std::tuple < tuple ... > >
-		{
-			using type = tmp::list < tuple ... > ;
-		} ;
-		template < typename ... list >
-		struct to_tuple < tmp::list < list ... > >
-		{
-			using type = std::tuple < list ... > ;
-		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct assign_result ;
 		template < typename lhs_type , typename rhs_type >
 		struct shift_result ;
-		template < typename rule_type , typename result_type , typename ... args_type >
-		struct assign_to_function ;
-		template < typename rule_type >
-		struct get_value_type ;
 		template < typename T , typename id_type , id_type id >
 		struct top_rule
 		{
@@ -156,6 +128,32 @@ namespace parser_combinator
 			auto operator = ( terminal && ) -> terminal & = default ;
 			~ terminal ( ) = default ;
 		} ;
+		template < typename T >
+		struct decl_component_id ;
+		struct current_read
+		{
+			using type = current_read ;
+		} ;
+		template < typename T >
+		using end_read = terminal < std::nullptr_t , COMPONENT_ID_IMPL ( T , parser_combinator_parser_decl_component_id_id_type_end ) > ;
+		template < typename tuple >
+		struct tuple_to_list ;
+		template < typename list >
+		struct to_tuple ;
+		template < typename ... tuple >
+		struct tuple_to_list < std::tuple < tuple ... > >
+		{
+			using type = tmp::list < tuple ... > ;
+		} ;
+		template < typename ... list >
+		struct to_tuple < tmp::list < list ... > >
+		{
+			using type = std::tuple < list ... > ;
+		} ;
+		template < typename rule_type , typename result_type , typename ... args_type >
+		struct assign_to_function ;
+		template < typename rule_type >
+		struct get_value_type ;
 		template < typename first_type , typename second_type >
 		class first_only_tuple
 			: public std::tuple < first_type , second_type >
@@ -330,6 +328,15 @@ namespace parser_combinator
 			<
 				typename get_rule_body < T >::type ,
 				tmp::integral < unsigned int , N >
+			>
+		{
+		} ;
+		template < typename T >
+		struct get_rule_id
+			: tmp::at
+			<
+				T ,
+				tmp::integral < unsigned int , 1 >
 			>
 		{
 		} ;
@@ -541,26 +548,23 @@ namespace parser_combinator
 		struct new_LR0s
 			: tmp::filter
 			<
-				tmp::eval
+				tmp::eval < tmp::elem
 				<
-					tmp::elem
+					get_rule_head < tmp::arg < 0 > > ,
+					typename tmp::map
 					<
-						get_rule_head < tmp::arg < 0 > > ,
-						typename tmp::map
+						get_next_read < tmp::arg < 0 > > ,
+						typename tmp::filter
 						<
-							get_next_read < tmp::arg < 0 > > ,
+							tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
 							typename tmp::filter
 							<
-								tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
-								typename tmp::filter
-								<
-									not_elem < tmp::arg < 0 > , set > ,
-									I
-								>::type
+								not_elem < tmp::arg < 0 > , set > ,
+								I
 							>::type
 						>::type
-					>
-				> ,
+					>::type
+				> > ,
 				typename tmp::filter
 				<
 					is_non_read < tmp::arg < 0 > > ,
@@ -610,7 +614,7 @@ namespace parser_combinator
 			<
 				tmp::list < > ,
 				typename tmp::to_list < I >::type ,
-				typename tmp::to_list < env >::type
+				env
 			>
 		{
 		} ;
@@ -630,7 +634,7 @@ namespace parser_combinator
 						typename get_rule_body < T >::type
 					>::type
 				> ,
-				typename tmp::at < T , tmp::integral < int , 1 > >::type
+				typename get_rule_id < T >::type
 			>
 		{
 		} ;
@@ -746,7 +750,7 @@ namespace parser_combinator
 					typename get_rule_head < rule >::type ,
 					typename remove_current_read_helper < rule >::type
 				> ,
-				typename tmp::at < rule , tmp::integral < int , 1 > >::type
+				typename get_rule_id < rule >::type
 			>
 		{
 		} ;
@@ -765,33 +769,24 @@ namespace parser_combinator
 				<
 					typename tmp::map
 					<
-						tmp::eval
+						tmp::eval < tmp::to_list
 						<
-							tmp::to_list
+							tmp::eval < make_first_helper
 							<
-								tmp::eval
-								<
-									make_first_helper
-									<
-										get_rule_body < tmp::arg < 0 > > ,
-										tmp::id < env >
-									>
-								>
-							>
-						> ,
+								get_rule_body < tmp::arg < 0 > > ,
+								tmp::id < env >
+							> >
+						> > ,
 						typename tmp::filter
 						<
-							tmp::eval
+							tmp::eval < tmp::equal
 							<
-								tmp::equal
-								<
-									tmp::id < rule_type < T , id_type , id > > ,
-									tmp::eval < get_rule_head < tmp::arg < 0 > > >
-								>
-							> ,
+								tmp::id < rule_type < T , id_type , id > > ,
+								tmp::eval < get_rule_head < tmp::arg < 0 > > >
+							> > ,
 							env
 						>::type
-					>
+					>::type
 				>::type
 			>
 		{
@@ -815,23 +810,23 @@ namespace parser_combinator
 					typename tmp::map
 					<
 						remove_current_read < tmp::arg < 0 > > ,
-						typename tmp::to_list < env >::type
+						env
 					>::type
 				>::type
 			>
 		{
 		} ;
-		template < typename A , typename env >
+		template < typename A , typename already , typename env >
 		struct make_follow ;
-		template < typename A , typename head , typename body , typename env >
+		template < typename A , typename head , typename body , typename already , typename env >
 		struct iterate_make_follow ;
-		template < typename A , typename head , typename body , typename env >
+		template < typename A , typename head , typename body , typename already , typename env >
 		struct iterate_make_follow
-			: iterate_make_follow < A , head , typename tmp::tail < body >::type , env >
+			: iterate_make_follow < A , head , typename tmp::tail < body >::type , already , env >
 		{
 		} ;
-		template < typename A , typename head , typename ... body , typename env >
-		struct iterate_make_follow < A , head , tmp::list < A , body ... > , env >
+		template < typename A , typename head , typename ... body , typename already , typename env >
+		struct iterate_make_follow < A , head , tmp::list < A , body ... > , already , env >
 			: tmp::union_
 			<
 				typename make_first < tmp::list < body ... > , env >::type ,
@@ -840,69 +835,126 @@ namespace parser_combinator
 					A ,
 					head ,
 					tmp::list < body ... > ,
+					typename tmp::insert
+					<
+						already ,
+						A
+					>::type ,
 					env
 				>::type
 			>
 		{
 		} ;
-		template < typename A , typename head , typename env >
-		struct iterate_make_follow < A , head , tmp::list < A > , env >
-			: make_follow < head , env >
+		template < typename A , typename head , typename already , typename env >
+		struct iterate_make_follow < A , head , tmp::list < A > , already , env >
+			: tmp::eval_if
+			<
+				tmp::elem < A , already > ,
+				tmp::id < tmp::set < > > ,
+				make_follow
+				<
+					head ,
+					typename tmp::insert
+					<
+						already ,
+						A
+					>::type ,
+					env
+				>
+			>
 		{
 		} ;
-		template < typename A , typename head , typename env >
-		struct iterate_make_follow < A , head , tmp::list < > , env >
+		template < typename A , typename head , typename already , typename env >
+		struct iterate_make_follow < A , head , tmp::list < > , already , env >
 			: tmp::set < >
 		{
 		} ;
-		template < typename A , typename rule , typename env >
+		template < typename A , typename rule , typename already , typename env >
 		struct iterate_make_follow_wrapper
 			: iterate_make_follow
 			<
 				A ,
 				typename get_rule_head < rule >::type ,
 				typename get_rule_body < rule >::type ,
+				already ,
+				env
+			>
+		{
+		} ;
+		template < typename A , typename already , typename env >
+		struct make_follow_helper
+			: tmp::foldr
+			<
+				tmp::eval < tmp::union_
+				<
+					iterate_make_follow_wrapper < A , tmp::arg < 0 > , already , env > ,
+					tmp::id < tmp::arg < 1 > >
+				> > ,
+				tmp::set < > ,
 				env
 			>
 		{
 		} ;
 		template < typename A , typename env >
-		struct make_follow_helper
-			: tmp::to_set
+		struct is_top_rule_right
+			: tmp::integral
 			<
-				typename tmp::concat
+				bool ,
+				( tmp::size <
+					typename tmp::filter
+					<
+						tmp::and_
+						<
+							tmp::eval < is_top_rule < get_rule_head < tmp::arg < 0 > > > > ,
+							tmp::eval < tmp::equal
+							<
+								tmp::list < A > ,
+								tmp::eval < get_rule_body
+								<
+									remove_current_read < tmp::arg < 0 > >
+								> >
+							> >
+						> ,
+						env
+					>::type
+				>::type::value > 0 )
+			>
+		{
+		} ;
+		template < typename A , typename already , typename env >
+		struct make_follow_
+			: make_follow_helper
+			<
+				A ,
+				already ,
+				typename tmp::unique
 				<
 					typename tmp::map
 					<
-						tmp::to_list < tmp::arg < 0 > > ,
-						typename tmp::map
-						<
-							iterate_make_follow_wrapper < A , tmp::arg < 0 > , env > ,
-							env
-						>::type
+						remove_current_read < tmp::arg < 0 > > ,
+						env
 					>::type
 				>::type
 			>
 		{
 		} ;
-		template < typename A , typename env >
+		template < typename A , typename already , typename env >
 		struct make_follow
-			: tmp::insert
+			: tmp::eval_if
 			<
-				typename make_follow_helper
+				typename is_top_rule_right < A , env >::type ,
+				tmp::insert
 				<
-					A ,
-					typename tmp::unique
-					<
-						typename tmp::map
-						<
-							remove_current_read < tmp::arg < 0 > > ,
-							typename tmp::to_list < env >::type
-						>::type
-					>::type
-				>::type ,
-				end_read
+					typename make_follow_ < A , already , env >::type ,
+					end_read < A >
+				> ,
+				make_follow_ < A , already , env >
 			>
+		{
+		} ;
+		template < typename A , typename env >
+		struct make_follow_wrapper
+			: make_follow < A , tmp::set < > , env >
 		{
 		} ;
 		template < int index , typename list >
@@ -932,14 +984,11 @@ namespace parser_combinator
 		struct collect_cmponent < tmp::list < T ... > >
 			: tmp::foldl
 			<
-				tmp::eval
+				tmp::eval < tmp::union_
 				<
-					tmp::union_
-					<
-						tmp::id < tmp::arg < 0 > > ,
-						collect_cmponent < tmp::arg < 1 > >
-					>
-				> ,
+					tmp::id < tmp::arg < 0 > > ,
+					collect_cmponent < tmp::arg < 1 > >
+				> > ,
 				tmp::set < > ,
 				tmp::list < T ... >
 			>
@@ -980,22 +1029,16 @@ namespace parser_combinator
 		struct make_goto_table_line
 			: tmp::foldr
 			<
-				tmp::eval
+				tmp::eval < tmp::insert_dict
 				<
-					tmp::insert_dict
+					get_id < tmp::arg < 0 > > ,
+					tmp::eval < tmp::lookup
 					<
-						get_id < tmp::arg < 0 > > ,
-						tmp::eval
-						<
-							tmp::lookup
-							<
-								make_goto < I , tmp::arg < 0 > , env > ,
-								tmp::id < Is >
-							>
-						> ,
-						tmp::id < tmp::arg < 1 > >
-					>
-				> ,
+						make_goto < I , tmp::arg < 0 > , env > ,
+						tmp::id < Is >
+					> > ,
+					tmp::id < tmp::arg < 1 > >
+				> > ,
 				tmp::dict < > ,
 				typename tmp::to_list < components >::type
 			>
@@ -1005,31 +1048,370 @@ namespace parser_combinator
 		struct make_goto_table
 			: tmp::foldr
 			<
-				tmp::eval
+				tmp::eval < tmp::insert_dict
 				<
-					tmp::insert_dict
+					tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
+					tmp::eval < make_goto_table_line
 					<
-						tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
-						tmp::eval
-						<
-							make_goto_table_line
-							<
-								tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
-								tmp::id < components > ,
-								tmp::id < Is > ,
-								tmp::id < env >
-							>
-						> ,
-						tmp::id < tmp::arg < 1 > >
-					>
-				> ,
+						tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
+						tmp::id < components > ,
+						tmp::id < Is > ,
+						tmp::id < env >
+					> > ,
+					tmp::id < tmp::arg < 1 > >
+				> > ,
 				tmp::dict < > ,
 				typename tmp::to_list < Is > ::type
 			>
 		{
 		} ;
+		template < typename T >
+		struct shift
+		{
+			using type = shift ;
+		} ;
+		template < typename T >
+		struct reduce
+		{
+			using type = reduce ;
+		} ;
+		struct accept
+		{
+			using type = accept ;
+		} ;
+		struct empty
+		{
+			using type = empty ;
+		} ;
+		template < typename T >
+		struct get_shift ;
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
+		struct get_shift < rule_type < T , id_type , id > >
+			: shift < tmp::integral < id_type , id > >
+		{
+		} ;
 		template < typename I , typename terminals , typename Is , typename env >
-		struct make_action_table ;
+		struct make_action_table_shift_line
+			: tmp::foldr
+			<
+				tmp::eval < tmp::insert_dict
+				<
+					get_shift < tmp::arg < 0 > > ,
+					tmp::eval < tmp::lookup
+					<
+						make_goto < I , tmp::arg < 0 > , env > ,
+						tmp::id < Is >
+					> > ,
+					tmp::id < tmp::arg < 1 > >
+				> > ,
+				tmp::dict < > ,
+				typename tmp::to_list < terminals >::type
+			>
+		{
+		} ;
+		template < typename terminals , typename Is , typename env >
+		struct make_action_table_shift
+			: tmp::foldr
+			<
+				tmp::eval < tmp::insert_dict
+				<
+					tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
+					tmp::eval < make_action_table_shift_line
+					<
+						tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
+						tmp::id < terminals > ,
+						tmp::id < Is > ,
+						tmp::id < env >
+					> > ,
+					tmp::id < tmp::arg < 1 > >
+				> > ,
+				tmp::dict < > ,
+				typename tmp::to_list < Is >::type
+			>
+		{
+		} ;
+		template < typename rule_type , typename env >
+		struct make_follow_list
+			: tmp::map
+			<
+				tmp::list
+				<
+					tmp::arg < 0 > ,
+					typename get_rule_id < rule_type >::type
+				> ,
+				typename tmp::to_list
+				<
+					typename make_follow_wrapper
+					<
+						typename get_rule_head < rule_type >::type ,
+						env
+					>::type
+				>::type
+			>
+		{
+		} ;
+		template < typename key , typename dict >
+		struct safe_lookup
+			: tmp::eval_if
+			<
+				tmp::find < key , dict > ,
+				tmp::lookup < key , dict > ,
+				tmp::id < tmp::dict < > >
+			>
+		{
+		} ;
+		template < typename key , typename val , typename dict >
+		struct safe_insert_dict
+			: tmp::insert_dict < key , val , dict >
+		{
+			static_assert
+			(
+				! tmp::find < key , dict >::type::value ,
+				"reduce/reduce conflict."
+			) ;
+		} ;
+		template < typename key1 , typename key2 , typename val , typename dict >
+		struct insert_two_dimensional_dict
+			: tmp::insert_dict
+			<
+				key1 ,
+				typename safe_insert_dict
+				<
+					key2 ,
+					val ,
+					typename safe_lookup < key1 , dict >::type
+				>::type ,
+				dict
+			>
+		{
+		} ;
+		template < typename I , typename index , typename dict , typename terminals , typename Is , typename env >
+		struct make_action_table_reduce_helper
+			: tmp::foldr
+			<
+				tmp::eval < insert_two_dimensional_dict
+				<
+					tmp::id < index > ,
+					tmp::eval < get_id
+					<
+						tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > >
+					> > ,
+					tmp::eval < reduce
+					<
+						tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > >
+					> > ,
+					tmp::id < tmp::arg < 1 > >
+				> > ,
+				dict ,
+				typename tmp::concat
+				<
+					typename tmp::map
+					<
+						make_follow_list < tmp::arg < 0 > , env > ,
+						typename tmp::to_list
+						<
+							typename tmp::filter
+							<
+								is_read_end < tmp::arg < 0 > > ,
+								I
+							>::type
+						>::type
+					>::type
+				>::type
+			>
+		{
+		} ;
+		template < typename terminals , typename Is , typename env >
+		struct make_action_table_reduce
+			: tmp::foldr
+			<
+				tmp::eval < make_action_table_reduce_helper
+				<
+					tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
+					tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
+					tmp::id < tmp::arg < 1 > > ,
+					tmp::id < terminals > ,
+					tmp::id < Is > ,
+					tmp::id < env >
+				> > ,
+				tmp::dict < > ,
+				typename tmp::to_list < Is >::type
+			>
+		{
+		} ;
+		template < typename key , typename dict >
+		struct safe_insert_accept_dict
+			: tmp::insert_dict < key , end_read < key > , dict >
+		{
+		} ;
+		template < typename T >
+		struct elem_all_read_end
+			: tmp::integral
+			<
+				bool ,
+				tmp::size
+				<
+					typename tmp::filter
+					<
+						tmp::eval < tmp::and_
+						<
+							tmp::eval < is_top_rule < get_rule_head < tmp::arg < 0 > > > > ,
+							is_read_end < tmp::arg < 0 > >
+						> > ,
+						typename tmp::at < T , tmp::integral < int , 0 > >::type
+					>::type
+				>::type::value != 0
+			>
+		{
+		} ;
+		template < typename terminals , typename Is , typename env >
+		struct make_action_table_accept
+			: tmp::foldr
+			<
+				tmp::eval_if
+				<
+					elem_all_read_end < tmp::arg < 0 > > ,
+					tmp::eval < insert_two_dimensional_dict
+					<
+						tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
+						get_id < end_read < Is > > ,
+						tmp::id < accept > ,
+						tmp::id < tmp::arg < 1 > >
+					> > ,
+					tmp::arg < 1 >
+				> ,
+				tmp::dict < > ,
+				typename tmp::to_list < Is >::type
+			>::type
+		{
+		} ;
+		template < typename key , typename dict , typename default_ >
+		struct safe_lookup_finally
+			: tmp::eval_if
+			<
+				typename tmp::find < key , dict >::type ,
+				tmp::lookup < key , dict > ,
+				tmp::id < default_ >
+			>
+		{
+		} ;
+		template < typename key1 , typename key2 , typename dict >
+		struct safe_lookup_two_dimensional
+			: safe_lookup_finally
+			<
+				key2 ,
+				typename safe_lookup_finally
+				<
+					key1 ,
+					dict ,
+					tmp::dict < >
+				>::type ,
+				empty
+			>
+		{
+		} ;
+		template < typename T >
+		struct get_main_value
+			: tmp::eval_if
+			<
+				tmp::equal < tmp::set < empty > , T > ,
+				tmp::id < empty > ,
+				tmp::head
+				<
+					typename tmp::to_list
+					<
+						typename tmp::filter
+						<
+							tmp::not_ < tmp::equal < empty , T > > ,
+							T
+						>::type
+					>::type
+				>
+			>
+		{
+			static_assert
+			(
+				tmp::size
+				<
+					typename tmp::filter
+					<
+						tmp::not_ < tmp::equal < empty , T > > ,
+						T
+					>::type
+				>::type::value <= 1 ,
+				"shift/reduce conflict"
+			) ;
+		} ;
+		template < typename Is_index , typename terminals_index , typename shift_table , typename reduce_table , typename accept_table , typename dict >
+		struct safe_insert_finally_insert_dict
+			: tmp::insert_dict
+			<
+				Is_index ,
+				typename tmp::insert_dict
+				<
+					terminals_index ,
+					typename get_main_value
+					<
+						typename tmp::map
+						<
+							safe_lookup_two_dimensional < Is_index , terminals_index , tmp::arg < 0 > > ,
+							tmp::set < shift_table , reduce_table , accept_table >
+						>::type
+					>::type ,
+					typename safe_lookup_finally < Is_index , dict , tmp::dict < > >::type
+				>::type ,
+				dict
+			>
+		{
+		} ;
+		template < typename Is_index , typename terminals_indexs , typename shift_table , typename reduce_table , typename accept_table , typename dict >
+		struct make_action_table_helper_line
+			: tmp::foldr
+			<
+				safe_insert_finally_insert_dict
+				<
+					Is_index ,
+					tmp::arg < 0 > ,
+					shift_table ,
+					reduce_table ,
+					accept_table ,
+					tmp::arg < 1 >
+				> ,
+				dict ,
+				terminals_indexs
+			>
+		{
+		} ;
+		template < typename Is_indexs , typename terminals_indexs , typename shift_table , typename reduce_table , typename accept_table >
+		struct make_action_table_helper
+			: tmp::foldr
+			<
+				make_action_table_helper_line < tmp::arg < 0 > , terminals_indexs , shift_table , reduce_table , accept_table , tmp::arg < 1 > > ,
+				tmp::dict < > ,
+				Is_indexs
+			>
+		{
+		} ;
+		template < typename terminals , typename Is , typename env >
+		struct make_action_table
+			: make_action_table_helper
+			<
+				typename tmp::map
+				<
+					tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
+					typename tmp::to_list < Is >::type
+				>::type ,
+				typename tmp::map
+				<
+					get_id < tmp::arg < 0 > > ,
+					typename tmp::to_list < terminals >::type
+				>::type ,
+				typename make_action_table_shift < terminals , Is , env >::type ,
+				typename make_action_table_reduce < terminals , Is , env >::type ,
+				typename make_action_table_accept < terminals , Is , env >::type
+			>
+		{
+		} ;
 		template < typename ... rules_type >
 		class parser
 		{
@@ -1046,8 +1428,15 @@ namespace parser_combinator
 			using top_rules = typename get_top_rules < LRs >::type ;
 			using closures = typename make_closures
 			<
-				tmp::set < typename make_closure < top_rules , LRs >::type > ,
-				LRs
+				tmp::set
+				<
+					typename make_closure
+					<
+						top_rules ,
+						typename tmp::to_list < LRs >::type
+					>::type
+				> ,
+				typename tmp::to_list < LRs >::type
 			>::type ;
 			using numbered_closures = typename numbering
 			<
@@ -1078,9 +1467,24 @@ namespace parser_combinator
 					tmp::integral < int , - 1 > ,
 					numbered_closures
 				>::type ,
-				LRs
+				typename tmp::to_list < LRs >::type
 			>::type ;
-			//typename tmp::print < goto_table >::type value ;
+			using test_tables = typename make_action_table
+			<
+				typename tmp::insert
+				<
+					terminals ,
+					end_read < LRs >
+				>::type ,
+				typename tmp::insert_dict
+				<
+					tmp::set < > ,
+					tmp::integral < int , - 1 > ,
+					numbered_closures
+				>::type ,
+				typename tmp::to_list < LRs >::type
+			>::type ;
+			//typename tmp::print < test_tables >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
