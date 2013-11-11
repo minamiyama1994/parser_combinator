@@ -2,6 +2,8 @@
 #define PARSER_COMBINATOR_PARSER_HPP
 #include<functional>
 #include<tuple>
+#include<memory>
+#include<list>
 #include"TMP/all.hpp"
 #include"TMP/and.hpp"
 #include"TMP/any.hpp"
@@ -53,25 +55,21 @@
 #include"TMP/unique.hpp"
 #include"TMP/xor.hpp"
 #include"TMP/zip.hpp"
-#define PARSER_COMBINATOR_PARSER_DECL_COMPONENT_ID(...) \
-namespace parser_combinator \
-{ \
-	namespace parser \
+#define DECL_RULE_IDS_BEGIN(name) \
+	enum class name \
 	{ \
-		template < > \
-		struct decl_component_id < parser_combinator::parser::detail::internal_id_tag < void >::type > \
-		{ \
-			enum class id_type \
-			{ \
-				parser_combinator_parser_decl_component_id_id_type_begin , \
-				__VA_ARGS__ , \
-				parser_combinator_parser_decl_component_id_id_type_end \
-			} ; \
-		} ; \
-	} \
-}
-#define COMPONENT_ID_IMPL(t,name) typename parser_combinator::parser::decl_component_id < typename parser_combinator::parser::detail::internal_id_tag < t >::type >::id_type , parser_combinator::parser::decl_component_id < typename parser_combinator::parser::detail::internal_id_tag < t >::type >::id_type::name
-#define COMPONENT_ID(name) COMPONENT_ID_IMPL ( void , name )
+		parser_combinator_parser_decl_rule_ids_begin ,
+#define DECL_RULE_ID(name) \
+	name ,
+#define DECL_RULE_IDS_END \
+		parser_combinator_parser_decl_rule_ids_end \
+	} ;
+#define DECL_TOP_RULE(T,id,name) \
+	parser_combinator::parser::top_rule < T , decltype ( id ) , id > name { }
+#define DECL_RULE(T,id,name) \
+	parser_combinator::parser::rule < T , decltype ( id ) , id > name { }
+#define DECL_TERMINAL(T,id,name) \
+	parser_combinator::parser::terminal < T , decltype ( id ) , id > name { }
 namespace parser_combinator
 {
 	namespace parser
@@ -100,7 +98,7 @@ namespace parser_combinator
 			auto operator = ( top_rule && ) -> top_rule & = default ;
 			~ top_rule ( ) = default ;
 			template < typename rhs_type >
-			auto operator = ( const rhs_type & ) -> assign_result < top_rule , typename rhs_type::type > ;
+			auto operator = ( const rhs_type & ) -> assign_result < top_rule , rhs_type > ;
 		} ;
 		template < typename T , typename id_type , id_type id >
 		struct rule
@@ -114,7 +112,7 @@ namespace parser_combinator
 			auto operator = ( rule && ) -> rule & = default ;
 			~ rule ( ) = default ;
 			template < typename rhs_type >
-			auto operator = ( const rhs_type & ) -> assign_result < rule , typename rhs_type::type > ;
+			auto operator = ( const rhs_type & ) -> assign_result < rule , rhs_type > ;
 		} ;
 		template < typename T , typename id_type , id_type id >
 		struct terminal
@@ -128,32 +126,124 @@ namespace parser_combinator
 			auto operator = ( terminal && ) -> terminal & = default ;
 			~ terminal ( ) = default ;
 		} ;
+		template < typename id_type >
+		class term
+		{
+			id_type id_ ;
+		public :
+			term ( ) = delete ;
+			term ( const term & ) = default ;
+			term ( term && ) = default ;
+			auto operator = ( const term & ) -> term & = default ;
+			auto operator = ( term && ) -> term & = default ;
+			term ( id_type id )
+				: id_ ( id )
+			{
+			}
+			virtual ~ term ( )
+			{
+			}
+			virtual auto is_top_rule ( ) -> bool
+			{
+				return false ;
+			}
+			virtual auto is_rule ( ) -> bool
+			{
+				return false ;
+			}
+			virtual auto is_terminal ( ) -> bool
+			{
+				return false ;
+			}
+			virtual auto is_current_read ( ) -> bool
+			{
+				return false ;
+			}
+			auto get ( ) const -> id_type
+			{
+				return id_ ;
+			}
+		} ;
+		template < typename id_type >
+		class detail_top_rule
+			: public term < id_type >
+		{
+		public :
+			detail_top_rule ( ) = delete ;
+			detail_top_rule ( const detail_top_rule & ) = default ;
+			detail_top_rule ( detail_top_rule && ) = default ;
+			auto operator = ( const detail_top_rule & ) -> detail_top_rule & = default ;
+			auto operator = ( detail_top_rule && ) -> detail_top_rule & = default ;
+			~ detail_top_rule ( ) = default ;
+			using term < id_type >::term ;
+			auto is_top_rule ( ) -> bool override
+			{
+				return true ;
+			}
+		} ;
+		template < typename id_type >
+		class detail_rule
+			: public term < id_type >
+		{
+		public :
+			detail_rule ( ) = delete ;
+			detail_rule ( const detail_rule & ) = default ;
+			detail_rule ( detail_rule && ) = default ;
+			auto operator = ( const detail_rule & ) -> detail_rule & = default ;
+			auto operator = ( detail_rule && ) -> detail_rule & = default ;
+			~ detail_rule ( ) = default ;
+			using term < id_type >::term ;
+			auto is_rule ( ) -> bool override
+			{
+				return true ;
+			}
+		} ;
+		template < typename id_type >
+		class detail_terminal
+			: public term < id_type >
+		{
+		public :
+			detail_terminal ( ) = delete ;
+			detail_terminal ( const detail_terminal & ) = default ;
+			detail_terminal ( detail_terminal && ) = default ;
+			auto operator = ( const detail_terminal & ) -> detail_terminal & = default ;
+			auto operator = ( detail_terminal && ) -> detail_terminal & = default ;
+			~ detail_terminal ( ) = default ;
+			using term < id_type >::term ;
+			auto is_terminal ( ) -> bool override
+			{
+				return true ;
+			}
+		} ;
+		template < typename id_type >
+		class current_read
+			: public term < id_type >
+		{
+		public :
+			current_read ( ) ;
+			current_read ( const current_read & ) = default ;
+			current_read ( current_read && ) = default ;
+			auto operator = ( const current_read & ) -> current_read & = default ;
+			auto operator = ( current_read && ) -> current_read & = default ;
+			~ current_read ( ) = default ;
+			auto is_current_read ( ) -> bool override
+			{
+				return true ;
+			}
+		} ;
+		template < typename id_type >
+		current_read < id_type >::current_read ( )
+			: term < id_type > ( static_cast < id_type > ( - 1 ) )
+		{
+		}
+		template < typename T , typename id_type >
+		using end_read = terminal < T , id_type , id_type::parser_combinator_parser_decl_rule_ids_end > ;
 		template < typename T >
-		struct decl_component_id ;
-		struct current_read
-		{
-			using type = current_read ;
-		} ;
-		template < typename T >
-		using end_read = terminal < std::nullptr_t , COMPONENT_ID_IMPL ( T , parser_combinator_parser_decl_component_id_id_type_end ) > ;
-		template < typename tuple >
-		struct tuple_to_list ;
-		template < typename list >
-		struct to_tuple ;
-		template < typename ... tuple >
-		struct tuple_to_list < std::tuple < tuple ... > >
-		{
-			using type = tmp::list < tuple ... > ;
-		} ;
-		template < typename ... list >
-		struct to_tuple < tmp::list < list ... > >
-		{
-			using type = std::tuple < list ... > ;
-		} ;
-		template < typename rule_type , typename result_type , typename ... args_type >
 		struct assign_to_function ;
 		template < typename rule_type >
 		struct get_value_type ;
+		template < typename rule_type >
+		struct get_id ;
 		template < typename first_type , typename second_type >
 		class first_only_tuple
 			: public std::tuple < first_type , second_type >
@@ -185,113 +275,37 @@ namespace parser_combinator
 		{
 		} ;
 		template < typename T >
-		struct shift_to_list ;
-		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
-		struct shift_to_list < rule_type < T , id_type , id > >
-		{
-			using type = tmp::list < rule_type < T , id_type , id > > ;
-		} ;
-		template < typename lhs_type , typename rhs_type >
-		struct shift_to_list < shift_result < lhs_type , rhs_type > >
-			: tmp::concat
-			<
-				tmp::list
-				<
-					typename shift_to_list < lhs_type >::type ,
-					tmp::list < rhs_type >
-				>
-			>
+		struct to_rule_list ;
+		template < typename ... list >
+		struct to_rule_list < std::tuple < list ... > >
+			: tmp::list < typename to_rule_list < list >::type ... >
 		{
 		} ;
 		template < typename T1 , typename T2 >
-		struct to_LR0 ;
-		template < typename ... T1 , typename T2 , typename  ... T2s >
-		struct to_LR0 < tmp::list < T1 ... > , tmp::list < T2 , T2s ... > >
-			: tmp::cons
-			<
-				tmp::list < T1 ... , current_read , T2 , T2s ... > ,
-				typename to_LR0
-				<
-					tmp::list < T1 ... , T2 > ,
-					tmp::list < T2s ... >
-				>::type
-			>
+		struct to_rule_list < first_only_tuple < T1 , T2 > >
 		{
+			using type = first_only_tuple < T1 , T2 > ;
 		} ;
-		template < typename ... T1 >
-		struct to_LR0 < tmp::list < T1 ... > , tmp::list < > >
-			: tmp::list < tmp::list < T1 ... , current_read > >
+		template < typename T1 , typename T2 >
+		struct to_rule_list < assign_result < T1 , T2 > >
 		{
+			using type = assign_result < T1 , T2 > ;
 		} ;
 		template < typename T >
-		struct assign_to_list ;
-		template < typename lhs_type , typename rhs_type >
-		struct assign_to_list < assign_result < lhs_type , rhs_type > >
-			: tmp::map
-			<
-				tmp::list < lhs_type , tmp::arg < 0 > > ,
-				typename to_LR0
-				<
-					tmp::list < > ,
-					typename shift_to_list < rhs_type >::type
-				>::type
-			>
-		{
-		} ;
-		template < typename T >
-		struct make_LR0 ;
-		template < typename T >
-		struct make_LR0_helper ;
-		template < >
-		struct make_LR0_helper < std::tuple < > >
-		{
-			using type = tmp::set < > ;
-		} ;
-		template < typename lhs_type , typename rhs_type >
-		struct make_LR0_helper < assign_result < lhs_type , rhs_type > >
-			: tmp::to_set
-			<
-				typename assign_to_list
-				<
-					assign_result < lhs_type , rhs_type >
-				>::type
-			>
+		struct to_list ;
+		template < typename ... list >
+		struct to_list < tmp::list < list ... > >
+			: tmp::list < typename to_list < list >::type ... >
 		{
 		} ;
 		template < typename T1 , typename T2 >
-		struct make_LR0_helper < first_only_tuple < T1 , T2 > >
-			: tmp::map
-			<
-				tmp::list < tmp::arg < 0 > , T2 > ,
-				typename tmp::to_list < typename make_LR0_helper < T1 >::type >::type
-			>
+		struct to_list < first_only_tuple < T1 , T2 > >
+			: tmp::list < typename to_list < T1 >::type, T2 >
 		{
 		} ;
-		template < typename T1 , typename ... T_ >
-		struct make_LR0_helper < std::tuple < T1 , T_ ... > >
-			: tmp::to_set
-			<
-				typename tmp::concat
-				<
-					tmp::list
-					<
-						typename make_LR0_helper < T1 >::type ,
-						typename tmp::to_list
-						<
-							typename make_LR0_helper < std::tuple < T_ ... > >::type
-						>::type
-					>
-				>::type
-			>
-		{
-		} ;
-		template < typename T >
-		struct get_rule_head
-			: tmp::at
-			<
-				typename tmp::at < T , tmp::integral < unsigned int , 0 > >::type ,
-				tmp::integral < unsigned int , 0 >
-			>
+		template < typename T1 , typename T2 >
+		struct to_list < assign_result < T1 , T2 > >
+			: tmp::list < T1 , typename T2::type >
 		{
 		} ;
 		template < typename T >
@@ -304,1114 +318,142 @@ namespace parser_combinator
 			: tmp::integral < bool , true >
 		{
 		} ;
-		template < typename LR0s >
-		struct get_top_rules_helper
-			: tmp::filter
-			<
-				tmp::eval < is_top_rule < get_rule_head < tmp::arg < 0 > > > > ,
-				LR0s
-			>
-		{
-		} ;
 		template < typename T >
-		struct get_rule_body
-			: tmp::at
-			<
-				typename tmp::at < T , tmp::integral < unsigned int , 0 > >::type ,
-				tmp::integral < unsigned int , 1 >
-			>
-		{
-		} ;
-		template < typename T , int N >
-		struct at_rule_body
-			: tmp::at
-			<
-				typename get_rule_body < T >::type ,
-				tmp::integral < unsigned int , N >
-			>
-		{
-		} ;
-		template < typename T >
-		struct get_rule_id
-			: tmp::at
-			<
-				T ,
-				tmp::integral < unsigned int , 1 >
-			>
-		{
-		} ;
-		template < typename T >
-		struct is_non_read
-			: tmp::equal < typename at_rule_body < T , 0 >::type , current_read >
-		{
-		} ;
-		template < typename LR0s >
 		struct get_top_rules
-			: tmp::to_set
-			<
-				typename tmp::filter
-				<
-					is_non_read < tmp::arg < 0 > > ,
-					typename get_top_rules_helper
-					<
-						typename tmp::to_list < LR0s >::type
-					>::type
-				>::type
-			>
-		{
-		} ;
-		template < typename T >
-		struct get_top_rule
-			: tmp::head
-			<
-				typename tmp::map
-				<
-					get_rule_head < tmp::arg < 0 > > ,
-					typename tmp::to_list
-					<
-						typename get_top_rules
-						<
-							typename make_LR0_helper < T >::type
-						>::type
-					>::type
-				>::type
-			>
-		{
-			static_assert
-			(
-				tmp::size <
-					typename tmp::unique
-					<
-						typename tmp::map
-						<
-							get_rule_head < tmp::arg < 0 > > ,
-							typename tmp::to_list
-							<
-								typename get_top_rules
-								<
-									typename make_LR0_helper < T >::type
-								>::type
-							>::type
-						>::type
-					>::type
-				>::type::value == 1 ,
-				""
-			) ;
-		} ;
-		template < typename rule >
-		struct rule_normalize ;
-		template < typename rule >
-		struct rule_normalize_element ;
-		template < typename rule , typename index >
-		struct rule_normalize < tmp::list < rule , index > >
-			: tmp::list
-			<
-				tmp::list
-				<
-					typename rule_normalize_element
-					<
-						typename get_rule_head
-						<
-							tmp::list < rule , index >
-						>::type
-					>::type ,
-					typename tmp::map
-					<
-						rule_normalize_element < tmp::arg < 0 > > ,
-						typename get_rule_body
-						<
-							tmp::list < rule , index >
-						>::type
-					>::type
-				> ,
-				index
-			>
-		{
-		} ;
-		template < typename T >
-		struct rule_normalize_element
-		{
-			using type = T ;
-		} ;
-		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
-		struct rule_normalize_element < rule_type < T , id_type , id > >
-			: rule < T , id_type , id >
-		{
-		} ;
-		template < typename T , typename id_type , id_type id >
-		struct rule_normalize_element < terminal < T , id_type , id > >
-			: terminal < T , id_type , id >
-		{
-		} ;
-		template < typename T >
-		struct make_LR0
-			: tmp::to_set
-			<
-				typename tmp::concat
-				<
-					tmp::list
-					<
-						typename tmp::map
-						<
-							tmp::list
-							<
-								tmp::arg < 0 > ,
-								tmp::integral < int , 0 >
-							> ,
-							typename assign_to_list
-							<
-								assign_result
-								<
-									top_rule
-									<
-										typename get_value_type
-										<
-											typename get_top_rule < T >::type
-										>::type ,
-										COMPONENT_ID_IMPL
-										(
-											T ,
-											parser_combinator_parser_decl_component_id_id_type_begin
-										)
-									> ,
-									typename rule_normalize_element
-									<
-										typename get_top_rule < T >::type
-									>::type
-								>
-							>::type
-						>::type ,
-						typename tmp::map
-						<
-							rule_normalize < tmp::arg < 0 > > ,
-							typename tmp::to_list
-							<
-								typename make_LR0_helper < T >::type
-							>::type
-						>::type
-					>
-				>::type
-			>
-		{
-		} ;
-		template < typename T >
-		struct is_not_terminal ;
-		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
-		struct is_not_terminal < rule_type < T , id_type , id > >
-			: tmp::integral < bool , true >
-		{
-		} ;
-		template < typename T , typename id_type , id_type id >
-		struct is_not_terminal < terminal < T , id_type , id > >
-			: tmp::integral < bool , false >
-		{
-		} ;
-		template < typename T >
-		struct get_next_read_helper ;
-		template < typename ... Ts >
-		struct get_next_read_helper < tmp::list < Ts ... > >
-			: get_next_read_helper < typename tmp::tail < tmp::list < Ts ... > >::type >
-		{
-		} ;
-		template < typename ... Ts >
-		struct get_next_read_helper < tmp::list < current_read , Ts ... > >
-			: tmp::head < tmp::list < Ts ... > >
-		{
-		} ;
-		template < typename T >
-		struct get_next_read
-			: get_next_read_helper < typename get_rule_body < T >::type >
-		{
-		} ;
-		template < typename T , typename seq >
-		struct not_elem
-			: tmp::not_
-			<
-				tmp::elem
-				<
-					T ,
-					seq
-				>
-			>
-		{
-		} ;
-		template < typename T >
-		struct is_read_end
-			: tmp::equal
-			<
-				current_read ,
-				typename tmp::last < typename get_rule_body < T >::type >::type
-			>
-		{
-		} ;
-		template < typename set , typename I , typename env >
-		struct new_LR0s
 			: tmp::filter
 			<
-				tmp::eval < tmp::elem
-				<
-					get_rule_head < tmp::arg < 0 > > ,
-					typename tmp::map
-					<
-						get_next_read < tmp::arg < 0 > > ,
-						typename tmp::filter
-						<
-							tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
-							typename tmp::filter
-							<
-								not_elem < tmp::arg < 0 > , set > ,
-								I
-							>::type
-						>::type
-					>::type
-				> > ,
-				typename tmp::filter
-				<
-					is_non_read < tmp::arg < 0 > > ,
-					env
-				>::type
-			>
-		{
-		} ;
-		template < typename set , typename I , typename env >
-		struct make_closure_helper
-			: tmp::eval_if
-			<
-				tmp::equal
-				<
-					typename tmp::to_set < set >::type ,
-					typename tmp::union_
-					<
-						typename tmp::to_set < set >::type ,
-						typename tmp::to_set < I >::type
-					>::type
-				> ,
-				tmp::to_set < set > ,
-				make_closure_helper
-				<
-					typename tmp::to_list
-					<
-						typename tmp::union_
-						<
-							typename tmp::to_set < set >::type ,
-							typename tmp::to_set < I >::type
-						>::type
-					>::type ,
-					typename new_LR0s
-					<
-						set ,
-						I ,
-						env
-					>::type ,
-					env
-				>
-			>
-		{
-		} ;
-		template < typename I , typename env >
-		struct make_closure
-			: make_closure_helper
-			<
-				tmp::list < > ,
-				typename tmp::to_list < I >::type ,
-				env
-			>
-		{
-		} ;
-		template < typename T >
-		struct promote_reading ;
-		template < typename T >
-		struct promote_reading_helper ;
-		template < typename T >
-		struct promote_reading
-			: tmp::list
-			<
-				tmp::list
-				<
-					typename get_rule_head < T >::type ,
-					typename promote_reading_helper
-					<
-						typename get_rule_body < T >::type
-					>::type
-				> ,
-				typename get_rule_id < T >::type
-			>
-		{
-		} ;
-		template < typename T >
-		struct promote_reading_helper
-			: tmp::cons
-			<
-				typename tmp::head < T >::type ,
-				typename promote_reading_helper
-				<
-					typename tmp::tail < T >::type
-				>::type
-			>
-		{
-		} ;
-		template < typename T , typename ... T_ >
-		struct promote_reading_helper < tmp::list < current_read , T , T_ ... > >
-			: tmp::list < T , current_read , T_ ... >
-		{
-		} ;
-		template < typename I , typename X , typename env >
-		struct make_goto
-			: make_closure
-			<
+				is_top_rule < tmp::arg < 0 > > ,
 				typename tmp::map
 				<
-					promote_reading < tmp::arg < 0 > > ,
-					typename tmp::filter
+					tmp::eval < tmp::at
 					<
-						tmp::eval < tmp::equal < get_next_read < tmp::arg < 0 > > , tmp::id < X > > > ,
-						typename tmp::filter
-						<
-							tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
-							I
-						>::type
-					>::type
-				>::type ,
-				env
-			>
-		{
-		} ;
-		template < typename Is , typename env >
-		struct make_closures ;
-		template < typename I , typename env >
-		struct make_closures_helper
-			: tmp::map
-			<
-				make_goto < I , tmp::arg < 0 > , env > ,
-				typename tmp::map
-				<
-					get_next_read < tmp::arg < 0 > > ,
-					typename tmp::filter
-					<
-						tmp::not_ < is_read_end < tmp::arg < 0 > > > ,
-						typename tmp::to_list < I >::type
-					>::type
+						tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
+						tmp::integral < int , 0 >
+					> > ,
+					typename tmp::to_set < typename to_list < T >::type >::type
 				>::type
 			>
 		{
 		} ;
-		template < typename Is , typename env >
-		struct new_Is
-			: tmp::union_
-			<
-				typename tmp::to_set
-				<
-					typename tmp::concat
-					<
-						typename tmp::map
-						<
-							make_closures_helper < tmp::arg < 0 > , env > ,
-							typename tmp::to_list < Is >::type
-						>::type
-					>::type
-				>::type ,
-				Is
-			>
+		template < typename id_type , id_type id >
+		auto get_detail_top_rule ( ) -> std::shared_ptr < detail_top_rule < id_type > >
 		{
-		} ;
-		template < typename Is , typename env >
-		struct make_closures
-			: tmp::eval_if
-			<
-				tmp::equal
-				<
-					typename new_Is < Is , env >::type ,
-					Is
-				> ,
-				tmp::id < Is > ,
-				make_closures
-				<
-					typename new_Is < Is , env >::type ,
-					env
-				>
-			>
+			static auto value = std::make_shared < detail_top_rule < id_type > > ( id ) ;
+			return value ;
+		}
+		template < typename id_type , id_type id >
+		auto get_detail_rule ( ) -> std::shared_ptr < detail_rule < id_type > >
 		{
-		} ;
-		template < typename rule >
-		struct remove_current_read_helper
-			: tmp::filter
-			<
-				tmp::not_ < tmp::equal < tmp::arg < 0 > , current_read > > ,
-				typename get_rule_body < rule >::type
-			>
+			static auto value = std::make_shared < detail_rule < id_type > > ( id ) ;
+			return value ;
+		}
+		template < typename id_type , id_type id >
+		auto get_detail_terminal ( ) -> std::shared_ptr < detail_terminal < id_type > >
 		{
-		} ;
-		template < typename rule >
-		struct remove_current_read
-			: tmp::list
-			<
-				tmp::list
-				<
-					typename get_rule_head < rule >::type ,
-					typename remove_current_read_helper < rule >::type
-				> ,
-				typename get_rule_id < rule >::type
-			>
+			static auto value = std::make_shared < detail_terminal < id_type > > ( id ) ;
+			return value ;
+		}
+		template < typename id_type >
+		auto get_current_read ( ) -> std::shared_ptr < current_read < id_type > >
 		{
-		} ;
-		template < typename A , typename env >
-		struct make_first_helper ;
-		template < typename T , typename id_type , id_type id , typename env >
-		struct make_first_helper < tmp::list < terminal < T , id_type , id > > , env >
-			: tmp::set < terminal < T , id_type , id > >
-		{
-		} ;
-		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id , typename env >
-		struct make_first_helper < tmp::list < rule_type < T , id_type , id > > , env >
-			: tmp::to_set
-			<
-				typename tmp::concat
-				<
-					typename tmp::map
-					<
-						tmp::eval < tmp::to_list
-						<
-							tmp::eval < make_first_helper
-							<
-								get_rule_body < tmp::arg < 0 > > ,
-								tmp::id < env >
-							> >
-						> > ,
-						typename tmp::filter
-						<
-							tmp::eval < tmp::equal
-							<
-								tmp::id < rule_type < T , id_type , id > > ,
-								tmp::eval < get_rule_head < tmp::arg < 0 > > >
-							> > ,
-							env
-						>::type
-					>::type
-				>::type
-			>
-		{
-		} ;
-		template < typename list , typename env >
-		struct make_first_helper
-			: make_first_helper
-			<
-				tmp::list < typename tmp::head < list >::type > ,
-				env
-			>
-		{
-		} ;
-		template < typename A , typename env >
-		struct make_first
-			: make_first_helper
-			<
-				A ,
-				typename tmp::unique
-				<
-					typename tmp::map
-					<
-						remove_current_read < tmp::arg < 0 > > ,
-						env
-					>::type
-				>::type
-			>
-		{
-		} ;
-		template < typename A , typename already , typename env >
-		struct make_follow ;
-		template < typename A , typename head , typename body , typename already , typename env >
-		struct iterate_make_follow ;
-		template < typename A , typename head , typename body , typename already , typename env >
-		struct iterate_make_follow
-			: iterate_make_follow < A , head , typename tmp::tail < body >::type , already , env >
-		{
-		} ;
-		template < typename A , typename head , typename ... body , typename already , typename env >
-		struct iterate_make_follow < A , head , tmp::list < A , body ... > , already , env >
-			: tmp::union_
-			<
-				typename make_first < tmp::list < body ... > , env >::type ,
-				typename iterate_make_follow
-				<
-					A ,
-					head ,
-					tmp::list < body ... > ,
-					typename tmp::insert
-					<
-						already ,
-						A
-					>::type ,
-					env
-				>::type
-			>
-		{
-		} ;
-		template < typename A , typename head , typename already , typename env >
-		struct iterate_make_follow < A , head , tmp::list < A > , already , env >
-			: tmp::eval_if
-			<
-				tmp::elem < A , already > ,
-				tmp::id < tmp::set < > > ,
-				make_follow
-				<
-					head ,
-					typename tmp::insert
-					<
-						already ,
-						A
-					>::type ,
-					env
-				>
-			>
-		{
-		} ;
-		template < typename A , typename head , typename already , typename env >
-		struct iterate_make_follow < A , head , tmp::list < > , already , env >
-			: tmp::set < >
-		{
-		} ;
-		template < typename A , typename rule , typename already , typename env >
-		struct iterate_make_follow_wrapper
-			: iterate_make_follow
-			<
-				A ,
-				typename get_rule_head < rule >::type ,
-				typename get_rule_body < rule >::type ,
-				already ,
-				env
-			>
-		{
-		} ;
-		template < typename A , typename already , typename env >
-		struct make_follow_helper
-			: tmp::foldr
-			<
-				tmp::eval < tmp::union_
-				<
-					iterate_make_follow_wrapper < A , tmp::arg < 0 > , already , env > ,
-					tmp::id < tmp::arg < 1 > >
-				> > ,
-				tmp::set < > ,
-				env
-			>
-		{
-		} ;
-		template < typename A , typename env >
-		struct is_top_rule_right
-			: tmp::integral
-			<
-				bool ,
-				( tmp::size <
-					typename tmp::filter
-					<
-						tmp::and_
-						<
-							tmp::eval < is_top_rule < get_rule_head < tmp::arg < 0 > > > > ,
-							tmp::eval < tmp::equal
-							<
-								tmp::list < A > ,
-								tmp::eval < get_rule_body
-								<
-									remove_current_read < tmp::arg < 0 > >
-								> >
-							> >
-						> ,
-						env
-					>::type
-				>::type::value > 0 )
-			>
-		{
-		} ;
-		template < typename A , typename already , typename env >
-		struct make_follow_
-			: make_follow_helper
-			<
-				A ,
-				already ,
-				typename tmp::unique
-				<
-					typename tmp::map
-					<
-						remove_current_read < tmp::arg < 0 > > ,
-						env
-					>::type
-				>::type
-			>
-		{
-		} ;
-		template < typename A , typename already , typename env >
-		struct make_follow
-			: tmp::eval_if
-			<
-				typename is_top_rule_right < A , env >::type ,
-				tmp::insert
-				<
-					typename make_follow_ < A , already , env >::type ,
-					end_read < A >
-				> ,
-				make_follow_ < A , already , env >
-			>
-		{
-		} ;
-		template < typename A , typename env >
-		struct make_follow_wrapper
-			: make_follow < A , tmp::set < > , env >
-		{
-		} ;
-		template < int index , typename list >
-		struct numbering ;
-		template < int index , typename list >
-		struct numbering
-			: tmp::insert_dict
-			<
-				typename tmp::head < list >::type ,
-				tmp::integral < int , index > ,
-				typename numbering
-				<
-					index + 1 ,
-					typename tmp::tail < list >::type
-				>::type
-			>
-		{
-		} ;
-		template < int index >
-		struct numbering < index , tmp::list < > >
-			: tmp::dict < >
-		{
-		} ;
+			static auto value = std::make_shared < current_read < id_type > > ( ) ;
+			return value ;
+		}
 		template < typename T >
-		struct collect_cmponent ;
-		template < typename ... T >
-		struct collect_cmponent < tmp::list < T ... > >
-			: tmp::foldl
-			<
-				tmp::eval < tmp::union_
-				<
-					tmp::id < tmp::arg < 0 > > ,
-					collect_cmponent < tmp::arg < 1 > >
-				> > ,
-				tmp::set < > ,
-				tmp::list < T ... >
-			>
+		struct make_LR0_heper ;
+		template < typename T , typename id_type , id_type id >
+		struct make_LR0_heper < top_rule < T , id_type , id > >
 		{
+			static auto func ( ) -> std::shared_ptr < term < id_type > >
+			{
+				return get_detail_rule < id_type , id > ( ) ;
+			}
+		} ;
+		template < typename T , typename id_type , id_type id >
+		struct make_LR0_heper < rule < T , id_type , id > >
+		{
+			static auto func ( ) -> std::shared_ptr < term < id_type > >
+			{
+				return get_detail_rule < id_type , id > ( ) ;
+			}
+		} ;
+		template < typename T , typename id_type , id_type id >
+		struct make_LR0_heper < terminal < T , id_type , id > >
+		{
+			static auto func ( ) -> std::shared_ptr < term < id_type > >
+			{
+				return get_detail_terminal < id_type , id > ( ) ;
+			}
 		} ;
 		template < typename T1 , typename T2 >
-		struct collect_cmponent < first_only_tuple < T1 , T2 > >
-			: collect_cmponent < T1 >
+		struct make_LR0_heper < assign_result < T1 , T2 > >
 		{
+			using head_type = typename tmp::at < typename assign_result < T1 , T2 >::type , tmp::integral < int , 0 > >::type ;
+			using body_type = typename tmp::at < typename assign_result < T1 , T2 >::type , tmp::integral < int , 1 > >::type ;
+			static auto func ( ) -> decltype ( std::make_pair ( make_LR0_heper < head_type >::func ( ) , make_LR0_heper < body_type >::func ( ) ) )
+			{
+				return std::make_pair ( make_LR0_heper < head_type >::func ( ) , make_LR0_heper < body_type >::func ( ) ) ;
+			}
 		} ;
-		template < typename T , typename ... T_ , typename int_type >
-		struct collect_cmponent < tmp::list < tmp::list < T , tmp::list < T_ ... > > , int_type > >
-			: tmp::insert
-			<
-				typename collect_cmponent < tmp::list < T_ ... > >::type ,
-				T
-			>
+		template < typename T1 , typename T2 >
+		struct make_LR0_heper < first_only_tuple < T1 , T2 > >
 		{
+			static auto func ( ) -> decltype ( std::make_pair ( make_LR0_heper < T1 >::func ( ) , T2::value ) )
+			{
+				return std::make_pair ( make_LR0_heper < T1 >::func ( ) , T2::value ) ;
+			}
 		} ;
-		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
-		struct collect_cmponent < rule_type < T , id_type , id > >
-			: tmp::set < rule_type < T , id_type , id > >
+		template < typename ... T >
+		struct make_LR0_heper < tmp::list < T ... > >
 		{
-		} ;
-		template < >
-		struct collect_cmponent < current_read >
-			: tmp::set < >
-		{
-		} ;
-		template < typename T >
-		struct get_id ;
-		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
-		struct get_id < rule_type < T , id_type , id > >
-			: tmp::integral < id_type , id >
-		{
-		} ;
-		template < typename I , typename components , typename Is , typename env >
-		struct make_goto_table_line
-			: tmp::foldr
-			<
-				tmp::eval < tmp::insert_dict
-				<
-					get_id < tmp::arg < 0 > > ,
-					tmp::eval < tmp::lookup
-					<
-						make_goto < I , tmp::arg < 0 > , env > ,
-						tmp::id < Is >
-					> > ,
-					tmp::id < tmp::arg < 1 > >
-				> > ,
-				tmp::dict < > ,
-				typename tmp::to_list < components >::type
-			>
-		{
-		} ;
-		template < typename components , typename Is , typename env >
-		struct make_goto_table
-			: tmp::foldr
-			<
-				tmp::eval < tmp::insert_dict
-				<
-					tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
-					tmp::eval < make_goto_table_line
-					<
-						tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
-						tmp::id < components > ,
-						tmp::id < Is > ,
-						tmp::id < env >
-					> > ,
-					tmp::id < tmp::arg < 1 > >
-				> > ,
-				tmp::dict < > ,
-				typename tmp::to_list < Is > ::type
-			>
-		{
+			static auto func ( ) -> std::list < typename tmp::head < tmp::list < decltype ( make_LR0_heper < T >::func ( ) ) ... > >::type >
+			{
+				return std::list < typename tmp::head < tmp::list < decltype ( make_LR0_heper < T >::func ( ) ) ... > >::type > { make_LR0_heper < T >::func ( ) ... } ;
+			}
 		} ;
 		template < typename T >
-		struct shift
+		auto make_LR0 ( ) -> decltype ( make_LR0_heper < T >::func ( ) )
 		{
-			using type = shift ;
-		} ;
-		template < typename T >
-		struct reduce
-		{
-			using type = reduce ;
-		} ;
-		struct accept
-		{
-			using type = accept ;
-		} ;
-		struct empty
-		{
-			using type = empty ;
-		} ;
-		template < typename T >
-		struct get_shift ;
-		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
-		struct get_shift < rule_type < T , id_type , id > >
-			: shift < tmp::integral < id_type , id > >
-		{
-		} ;
-		template < typename I , typename terminals , typename Is , typename env >
-		struct make_action_table_shift_line
-			: tmp::foldr
+			static_assert ( tmp::size < typename get_top_rules < T >::type >::value == 1 , "top_rule is duplication." ) ;
+			using id_type = get_id
 			<
-				tmp::eval < tmp::insert_dict
-				<
-					get_shift < tmp::arg < 0 > > ,
-					tmp::eval < tmp::lookup
-					<
-						make_goto < I , tmp::arg < 0 > , env > ,
-						tmp::id < Is >
-					> > ,
-					tmp::id < tmp::arg < 1 > >
-				> > ,
-				tmp::dict < > ,
-				typename tmp::to_list < terminals >::type
-			>
-		{
-		} ;
-		template < typename terminals , typename Is , typename env >
-		struct make_action_table_shift
-			: tmp::foldr
-			<
-				tmp::eval < tmp::insert_dict
-				<
-					tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
-					tmp::eval < make_action_table_shift_line
-					<
-						tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
-						tmp::id < terminals > ,
-						tmp::id < Is > ,
-						tmp::id < env >
-					> > ,
-					tmp::id < tmp::arg < 1 > >
-				> > ,
-				tmp::dict < > ,
-				typename tmp::to_list < Is >::type
-			>
-		{
-		} ;
-		template < typename rule_type , typename env >
-		struct make_follow_list
-			: tmp::map
-			<
-				tmp::list
-				<
-					tmp::arg < 0 > ,
-					typename get_rule_id < rule_type >::type
-				> ,
-				typename tmp::to_list
-				<
-					typename make_follow_wrapper
-					<
-						typename get_rule_head < rule_type >::type ,
-						env
-					>::type
-				>::type
-			>
-		{
-		} ;
-		template < typename key , typename dict >
-		struct safe_lookup
-			: tmp::eval_if
-			<
-				tmp::find < key , dict > ,
-				tmp::lookup < key , dict > ,
-				tmp::id < tmp::dict < > >
-			>
-		{
-		} ;
-		template < typename key , typename val , typename dict >
-		struct safe_insert_dict
-			: tmp::insert_dict < key , val , dict >
-		{
-			static_assert
-			(
-				! tmp::find < key , dict >::type::value ,
-				"reduce/reduce conflict."
-			) ;
-		} ;
-		template < typename key1 , typename key2 , typename val , typename dict >
-		struct insert_two_dimensional_dict
-			: tmp::insert_dict
-			<
-				key1 ,
-				typename safe_insert_dict
-				<
-					key2 ,
-					val ,
-					typename safe_lookup < key1 , dict >::type
-				>::type ,
-				dict
-			>
-		{
-		} ;
-		template < typename I , typename index , typename dict , typename terminals , typename Is , typename env >
-		struct make_action_table_reduce_helper
-			: tmp::foldr
-			<
-				tmp::eval < insert_two_dimensional_dict
-				<
-					tmp::id < index > ,
-					tmp::eval < get_id
-					<
-						tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > >
-					> > ,
-					tmp::eval < reduce
-					<
-						tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > >
-					> > ,
-					tmp::id < tmp::arg < 1 > >
-				> > ,
-				dict ,
-				typename tmp::concat
-				<
-					typename tmp::map
-					<
-						make_follow_list < tmp::arg < 0 > , env > ,
-						typename tmp::to_list
-						<
-							typename tmp::filter
-							<
-								is_read_end < tmp::arg < 0 > > ,
-								I
-							>::type
-						>::type
-					>::type
-				>::type
-			>
-		{
-		} ;
-		template < typename terminals , typename Is , typename env >
-		struct make_action_table_reduce
-			: tmp::foldr
-			<
-				tmp::eval < make_action_table_reduce_helper
-				<
-					tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
-					tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
-					tmp::id < tmp::arg < 1 > > ,
-					tmp::id < terminals > ,
-					tmp::id < Is > ,
-					tmp::id < env >
-				> > ,
-				tmp::dict < > ,
-				typename tmp::to_list < Is >::type
-			>
-		{
-		} ;
-		template < typename key , typename dict >
-		struct safe_insert_accept_dict
-			: tmp::insert_dict < key , end_read < key > , dict >
-		{
-		} ;
-		template < typename T >
-		struct elem_all_read_end
-			: tmp::integral
-			<
-				bool ,
-				tmp::size
-				<
-					typename tmp::filter
-					<
-						tmp::eval < tmp::and_
-						<
-							tmp::eval < is_top_rule < get_rule_head < tmp::arg < 0 > > > > ,
-							is_read_end < tmp::arg < 0 > >
-						> > ,
-						typename tmp::at < T , tmp::integral < int , 0 > >::type
-					>::type
-				>::type::value != 0
-			>
-		{
-		} ;
-		template < typename terminals , typename Is , typename env >
-		struct make_action_table_accept
-			: tmp::foldr
-			<
-				tmp::eval_if
-				<
-					elem_all_read_end < tmp::arg < 0 > > ,
-					tmp::eval < insert_two_dimensional_dict
-					<
-						tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
-						get_id < end_read < Is > > ,
-						tmp::id < accept > ,
-						tmp::id < tmp::arg < 1 > >
-					> > ,
-					tmp::arg < 1 >
-				> ,
-				tmp::dict < > ,
-				typename tmp::to_list < Is >::type
-			>::type
-		{
-		} ;
-		template < typename key , typename dict , typename default_ >
-		struct safe_lookup_finally
-			: tmp::eval_if
-			<
-				typename tmp::find < key , dict >::type ,
-				tmp::lookup < key , dict > ,
-				tmp::id < default_ >
-			>
-		{
-		} ;
-		template < typename key1 , typename key2 , typename dict >
-		struct safe_lookup_two_dimensional
-			: safe_lookup_finally
-			<
-				key2 ,
-				typename safe_lookup_finally
-				<
-					key1 ,
-					dict ,
-					tmp::dict < >
-				>::type ,
-				empty
-			>
-		{
-		} ;
-		template < typename T >
-		struct get_main_value
-			: tmp::eval_if
-			<
-				tmp::equal < tmp::set < empty > , T > ,
-				tmp::id < empty > ,
-				tmp::head
+				typename tmp::head
 				<
 					typename tmp::to_list
 					<
-						typename tmp::filter
-						<
-							tmp::not_ < tmp::equal < empty , T > > ,
-							T
-						>::type
+						typename get_top_rules < T >::type
 					>::type
-				>
-			>
-		{
-			static_assert
+				>::type
+			> ;
+			auto tmp_res = make_LR0_heper < T >::func ( ) ;
+			tmp_res.emplace_front
 			(
-				tmp::size
-				<
-					typename tmp::filter
-					<
-						tmp::not_ < tmp::equal < empty , T > > ,
-						T
-					>::type
-				>::type::value <= 1 ,
-				"shift/reduce conflict"
+				std::make_pair
+				(
+					get_detail_top_rule < typename id_type::type , id_type::type::parser_combinator_parser_decl_rule_ids_begin > ( ) ,
+					std::list < std::shared_ptr < term < typename id_type::type > > >
+					{
+						get_detail_rule < typename id_type::type , id_type::value > ( )
+					}
+				) ,
+				0
 			) ;
-		} ;
-		template < typename Is_index , typename terminals_index , typename shift_table , typename reduce_table , typename accept_table , typename dict >
-		struct safe_insert_finally_insert_dict
-			: tmp::insert_dict
-			<
-				Is_index ,
-				typename tmp::insert_dict
-				<
-					terminals_index ,
-					typename get_main_value
-					<
-						typename tmp::map
-						<
-							safe_lookup_two_dimensional < Is_index , terminals_index , tmp::arg < 0 > > ,
-							tmp::set < shift_table , reduce_table , accept_table >
-						>::type
-					>::type ,
-					typename safe_lookup_finally < Is_index , dict , tmp::dict < > >::type
-				>::type ,
-				dict
-			>
-		{
-		} ;
-		template < typename Is_index , typename terminals_indexs , typename shift_table , typename reduce_table , typename accept_table , typename dict >
-		struct make_action_table_helper_line
-			: tmp::foldr
-			<
-				safe_insert_finally_insert_dict
-				<
-					Is_index ,
-					tmp::arg < 0 > ,
-					shift_table ,
-					reduce_table ,
-					accept_table ,
-					tmp::arg < 1 >
-				> ,
-				dict ,
-				terminals_indexs
-			>
-		{
-		} ;
-		template < typename Is_indexs , typename terminals_indexs , typename shift_table , typename reduce_table , typename accept_table >
-		struct make_action_table_helper
-			: tmp::foldr
-			<
-				make_action_table_helper_line < tmp::arg < 0 > , terminals_indexs , shift_table , reduce_table , accept_table , tmp::arg < 1 > > ,
-				tmp::dict < > ,
-				Is_indexs
-			>
-		{
-		} ;
-		template < typename terminals , typename Is , typename env >
-		struct make_action_table
-			: make_action_table_helper
-			<
-				typename tmp::map
-				<
-					tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > > ,
-					typename tmp::to_list < Is >::type
-				>::type ,
-				typename tmp::map
-				<
-					get_id < tmp::arg < 0 > > ,
-					typename tmp::to_list < terminals >::type
-				>::type ,
-				typename make_action_table_shift < terminals , Is , env >::type ,
-				typename make_action_table_reduce < terminals , Is , env >::type ,
-				typename make_action_table_accept < terminals , Is , env >::type
-			>
-		{
-		} ;
+			decltype ( tmp_res ) res ;
+			for ( auto & elem : tmp_res )
+			{
+				auto index = elem.second ;
+				auto head = elem.first.first ;
+				for ( auto iter = elem.first.second.begin ( ) ; iter != elem.first.second.end ( ) ; ++ iter )
+				{
+					auto pos = elem.first.second.insert ( iter , get_current_read < typename id_type::type > ( ) ) ;
+					res.emplace_back ( std::make_pair ( head , elem.first.second ) , index ) ;
+					elem.first.second.erase ( pos ) ;
+				}
+				elem.first.second.insert ( elem.first.second.end ( ) , get_current_read < typename id_type::type > ( ) ) ;
+				res.emplace_back ( std::make_pair ( head , elem.first.second ) , index ) ;
+			}
+			return res ;
+		}
 		template < typename ... rules_type >
 		class parser
 		{
@@ -1421,70 +463,14 @@ namespace parser_combinator
 				tmp::list < > ,
 				rules_type ...
 			>::type ;
-			using LRs = typename make_LR0
-			<
-				rules_type_
-			>::type ;
-			using top_rules = typename get_top_rules < LRs >::type ;
-			using closures = typename make_closures
-			<
-				tmp::set
+			std::function < void ( ) > fun = [ ] ( )
+			{
+				auto value = make_LR0
 				<
-					typename make_closure
-					<
-						top_rules ,
-						typename tmp::to_list < LRs >::type
-					>::type
-				> ,
-				typename tmp::to_list < LRs >::type
-			>::type ;
-			using numbered_closures = typename numbering
-			<
-				0 ,
-				typename tmp::to_list < closures >::type
-			>::type ;
-			using types_list = typename collect_cmponent
-			<
-				typename tmp::to_list < LRs >::type
-			>::type ;
-			using terminals = typename tmp::filter
-			<
-				tmp::not_ < is_not_terminal < tmp::arg < 0 > > > ,
-				types_list
-			>::type ;
-			using non_terminals = typename tmp::filter
-			<
-				is_not_terminal < tmp::arg < 0 > > ,
-				types_list
-			>::type ;
+					typename to_rule_list < rules_type_ >::type
+				> ( ) ;
+			} ;
 			rules_type_ rules_ ;
-			using goto_table = typename make_goto_table
-			<
-				non_terminals ,
-				typename tmp::insert_dict
-				<
-					tmp::set < > ,
-					tmp::integral < int , - 1 > ,
-					numbered_closures
-				>::type ,
-				typename tmp::to_list < LRs >::type
-			>::type ;
-			using test_tables = typename make_action_table
-			<
-				typename tmp::insert
-				<
-					terminals ,
-					end_read < LRs >
-				>::type ,
-				typename tmp::insert_dict
-				<
-					tmp::set < > ,
-					tmp::integral < int , - 1 > ,
-					numbered_closures
-				>::type ,
-				typename tmp::to_list < LRs >::type
-			>::type ;
-			//typename tmp::print < test_tables >::type value ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
@@ -1496,74 +482,97 @@ namespace parser_combinator
 			template < typename T , typename id_type >
 			auto operator ( ) ( const T & value , id_type id ) -> parser & ;
 		} ;
-		template < typename rule_type , typename result_type , typename ... args_type >
-		struct assign_to_function
+		template < typename head_type , typename ... tail_type >
+		struct assign_to_function < tmp::list < head_type , tmp::list < tail_type ... > > >
 		{
-			using type = std::function < result_type ( const typename get_value_type < rule_type >::type & , const args_type & ... ) > ;
+			using type = std::function < typename get_value_type < head_type >::type ( const typename get_value_type < tail_type >::type & ... ) > ;
 			static type value ;
 		} ;
-		template < typename rule_type , typename result_type , typename ... args_type >
-		typename assign_to_function < rule_type , result_type , args_type ... >::type assign_to_function < rule_type , result_type , args_type ... >::value = [ ] ( const typename get_value_type < rule_type >::type & arg0 , const args_type & ... args ) { return result_type { arg0 , args ... } ; } ;
-		template < typename lhs_type , typename rhs_type , typename result_type , typename ... args_type >
-		struct assign_to_function < shift_result < lhs_type , rhs_type > , result_type , args_type ... >
-			: assign_to_function < lhs_type , result_type , typename get_value_type < rhs_type >::type , args_type ... >
-		{
-		} ;
+		template < typename head_type , typename ... tail_type >
+		typename assign_to_function < tmp::list < head_type , tmp::list < tail_type ... > > >::type assign_to_function < tmp::list < head_type , tmp::list < tail_type ... > > >::value = [ ] ( const typename get_value_type < tail_type >::type & ... ) { return typename get_value_type < head_type >::type { } ; } ;
 		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
 		struct get_value_type < rule_type < T , id_type , id > >
 		{
 			using type = T ;
 		} ;
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
+		struct get_id < rule_type < T , id_type , id > >
+		{
+			using type = id_type ;
+			static constexpr id_type value = id ;
+		} ;
+		template < typename T >
+		struct rule_to_list ;
+		template < template < typename T , typename id_type , id_type id > class rule_type , typename T , typename id_type , id_type id >
+		struct rule_to_list < rule_type < T , id_type , id > >
+			: tmp::list < rule_type < T , id_type , id > >
+		{
+		} ;
+		template < typename lhs_type , typename rhs_type >
+		struct rule_to_list < shift_result < lhs_type , rhs_type > >
+			: shift_result < lhs_type , rhs_type >
+		{
+		} ;
 		template < typename lhs_type , typename rhs_lhs_type , typename rhs_rhs_type >
 		struct assign_result < lhs_type , assign_result < rhs_lhs_type , rhs_rhs_type > > ;
 		template < typename T , typename id_type , id_type id , typename rhs_type >
-		struct assign_result < top_rule < T , id_type , id > , rhs_type >
+		struct assign_result < terminal < T , id_type , id > , rhs_type > ;
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id , typename rhs_type >
+		struct assign_result < rule_type < T , id_type , id > , rhs_type >
 		{
-			using type = assign_result ;
-			static typename assign_to_function < rhs_type , T >::type value ;
+			using type = tmp::list < rule_type < T , id_type , id > , typename rule_to_list < rhs_type >::type > ;
+			using function_type = typename assign_to_function < type >::type ;
+			function_type value { assign_to_function < type >::value } ;
+			auto operator ( ) ( const function_type & function ) -> assign_result & ;
 		} ;
-		template < typename T , typename id_type , id_type id , typename rhs_type >
-		struct assign_result < rule < T , id_type , id > , rhs_type >
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id , typename rhs_type >
+		auto assign_result < rule_type < T , id_type , id > , rhs_type >::operator ( ) ( const function_type & function ) -> assign_result &
 		{
-			using type = assign_result ;
-			static typename assign_to_function < rhs_type , T >::type value ;
-		} ;
-		template < typename T , typename id_type , id_type id , typename rhs_type >
-		typename assign_to_function < rhs_type , T >::type assign_result < top_rule < T , id_type , id > , rhs_type >::value { assign_to_function < rhs_type , T >::value } ;
-		template < typename T , typename id_type , id_type id , typename rhs_type >
-		typename assign_to_function < rhs_type , T >::type assign_result < rule < T , id_type , id > , rhs_type >::value { assign_to_function < rhs_type , T >::value } ;
+			value = function ;
+			return * this ;
+		}
 		template < typename lhs_lhs_type , typename lhs_rhs_type , typename rhs_type >
 		struct shift_result < assign_result < lhs_lhs_type , lhs_rhs_type > , rhs_type > ;
 		template < typename lhs_type , typename rhs_lhs_type , typename rhs_rhs_type >
 		struct shift_result < lhs_type , assign_result < rhs_lhs_type , rhs_rhs_type > > ;
 		template < typename lhs_lhs_type , typename lhs_rhs_type , typename rhs_lhs_type , typename rhs_rhs_type >
 		struct shift_result < assign_result < lhs_lhs_type , lhs_rhs_type > , assign_result < rhs_lhs_type , rhs_rhs_type > > ;
-		template < typename lhs_type , typename rhs_type >
-		struct shift_result
-		{
-			using type = shift_result ;
-		} ;
 		template < typename lhs_type , typename rhs_lhs_type , typename rhs_rhs_type >
 		struct shift_result < lhs_type , shift_result < rhs_lhs_type , rhs_rhs_type > >
-			: shift_result < typename shift_result < lhs_type , rhs_lhs_type >::type , typename rhs_rhs_type::type >
+			: tmp::cons < lhs_type , typename shift_result < rhs_lhs_type , rhs_rhs_type >::type >
+		{
+		} ;
+		template < typename lhs_lhs_type , typename lhs_rhs_type , typename rhs_type >
+		struct shift_result < shift_result < lhs_lhs_type , lhs_rhs_type > , rhs_type >
+			: tmp::append < typename shift_result < lhs_lhs_type , lhs_rhs_type >::type , tmp::list < rhs_type > >
+		{
+		} ;
+		template < typename lhs_lhs_type , typename lhs_rhs_type , typename rhs_lhs_type , typename rhs_rhs_type >
+		struct shift_result < shift_result < lhs_lhs_type , lhs_rhs_type > , shift_result < rhs_lhs_type , rhs_rhs_type > >
+			: tmp::append < typename shift_result < lhs_lhs_type , lhs_rhs_type >::type , typename shift_result < rhs_lhs_type , rhs_rhs_type >::type >
 		{
 		} ;
 		template < typename lhs_type , typename rhs_type >
-		auto operator >> ( const lhs_type & , const rhs_type & ) -> typename shift_result < typename lhs_type::type , typename rhs_type::type >::type
+		struct shift_result
+			: tmp::list < lhs_type , rhs_type >
 		{
-			return typename shift_result < typename lhs_type::type , typename rhs_type::type >::type { } ;
+		} ;
+		template < typename lhs_type , typename rhs_type >
+		auto operator >> ( const lhs_type & , const rhs_type & ) -> shift_result < lhs_type , rhs_type >
+		{
+			return shift_result < lhs_type , rhs_type > { } ;
 		}
 		template < typename T , typename id_type , id_type id >
 		template < typename rhs_type >
-		auto top_rule < T , id_type , id >::operator = ( const rhs_type & ) -> assign_result < top_rule , typename rhs_type::type >
+		auto top_rule < T , id_type , id >::operator = ( const rhs_type & ) -> assign_result < top_rule , rhs_type >
 		{
-			return assign_result < top_rule , typename rhs_type::type > { } ;
+			return assign_result < top_rule , rhs_type > { } ;
 		} ;
 		template < typename T , typename id_type , id_type id >
 		template < typename rhs_type >
-		auto rule < T , id_type , id >::operator = ( const rhs_type & ) -> assign_result < rule , typename rhs_type::type >
+		auto rule < T , id_type , id >::operator = ( const rhs_type & ) -> assign_result < rule , rhs_type >
 		{
-			return assign_result < rule , typename rhs_type::type > { } ;
+			return assign_result < rule , rhs_type > { } ;
 		} ;
 		template < typename ... rules_type >
 		parser < rules_type ... >::parser ( const rules_type & ... rules )
