@@ -256,22 +256,30 @@ namespace parser_combinator
 			auto operator = ( first_only_tuple && ) -> first_only_tuple & = default ;
 			~ first_only_tuple ( ) = default ;
 			first_only_tuple ( const first_type & first ) ;
+			template < typename T >
+			first_only_tuple ( const T & ) ;
 		} ;
 		template < typename first_type , typename second_type >
 		first_only_tuple < first_type , second_type >::first_only_tuple ( const first_type & first )
 			: std::tuple < first_type , second_type > { first , second_type { } }
 		{
 		}
+		template < typename first_type , typename second_type >
+		template < typename T >
+		first_only_tuple < first_type , second_type >::first_only_tuple ( const T & )
+			: std::tuple < first_type , second_type > { first_type { } , second_type { } }
+		{
+		}
 		template < int index , typename type_tuple , typename ... args_type >
-		struct make_rules ;
+		struct make_rules_helper ;
 		template < int index , typename ... type_in_tuple >
-		struct make_rules < index , tmp::list < type_in_tuple ... > >
+		struct make_rules_helper < index , tmp::list < type_in_tuple ... > >
 		{
 			using type = std::tuple < type_in_tuple ... > ;
 		} ;
 		template < int index , typename ... type_in_tuple , typename args_head , typename ... args_type >
-		struct make_rules < index , tmp::list < type_in_tuple ... > , args_head , args_type ... >
-			: make_rules < index + 1 , tmp::list < type_in_tuple ... , first_only_tuple < args_head , tmp::integral < int , index > > > , args_type ... >
+		struct make_rules_helper < index , tmp::list < type_in_tuple ... > , args_head , args_type ... >
+			: make_rules_helper < index + 1 , tmp::list < type_in_tuple ... , first_only_tuple < args_head , tmp::integral < int , index > > > , args_type ... >
 		{
 		} ;
 		template < typename T >
@@ -300,7 +308,7 @@ namespace parser_combinator
 		} ;
 		template < typename T1 , typename T2 >
 		struct to_list < first_only_tuple < T1 , T2 > >
-			: tmp::list < typename to_list < T1 >::type, T2 >
+			: tmp::list < typename to_list < T1 >::type , T2 >
 		{
 		} ;
 		template < typename T1 , typename T2 >
@@ -319,20 +327,83 @@ namespace parser_combinator
 		{
 		} ;
 		template < typename T >
-		struct get_top_rules
-			: tmp::filter
+		struct get_top_rule
+			: tmp::head
 			<
-				is_top_rule < tmp::arg < 0 > > ,
-				typename tmp::map
+				typename tmp::to_list
 				<
-					tmp::eval < tmp::at
+					typename tmp::filter
 					<
-						tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
-						tmp::integral < int , 0 >
-					> > ,
-					typename tmp::to_set < typename to_list < T >::type >::type
+						is_top_rule < tmp::arg < 0 > > ,
+						typename tmp::map
+						<
+							tmp::eval < tmp::at
+							<
+								tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
+								tmp::integral < int , 0 >
+							> > ,
+							typename tmp::to_set < typename to_list < T >::type >::type
+						>::type
+					>::type
 				>::type
+			>::type
+		{
+			static_assert ( tmp::size
+			<
+				typename tmp::to_list
+				<
+					typename tmp::filter
+					<
+						is_top_rule < tmp::arg < 0 > > ,
+						typename tmp::map
+						<
+							tmp::eval < tmp::at
+							<
+								tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
+								tmp::integral < int , 0 >
+							> > ,
+							typename tmp::to_set < typename to_list < T >::type >::type
+						>::type
+					>::type
+				>::type
+			>::value == 1 , "top_rule is duplication." ) ;
+		} ;
+		template < typename T , typename type_tuple >
+		struct make_rules_impl_helper ;
+		template < typename T , typename id_type , id_type id , typename ... type_tuple >
+		struct make_rules_impl_helper < top_rule < T , id_type , id > , std::tuple < type_tuple ... > >
+		{
+			using type = std::tuple
+			<
+				first_only_tuple
+				<
+					assign_result
+					<
+						top_rule < T , id_type , id_type::parser_combinator_parser_decl_rule_ids_begin > ,
+						rule < T , id_type , id >
+					> ,
+					tmp::integral < int , 0 >
+				> ,
+				type_tuple ...
+			> ;
+		} ;
+		template < typename T >
+		struct make_rules_impl ;
+		template < typename ... T >
+		struct make_rules_impl < std::tuple < T ... > >
+			: make_rules_impl_helper
+			<
+				typename get_top_rule
+				<
+					typename to_rule_list < std::tuple < T ... > >::type
+				>::type ,
+				std::tuple < T ... >
 			>
+		{
+		} ;
+		template < int index , typename type_tuple , typename ... args_type >
+		struct make_rules
+			: make_rules_impl < typename make_rules_helper < index , type_tuple , args_type ... >::type >
 		{
 		} ;
 		template < typename id_type , id_type id >
@@ -361,6 +432,14 @@ namespace parser_combinator
 		}
 		template < typename T >
 		struct make_LR0_heper ;
+		template < typename T , typename id_type >
+		struct make_LR0_heper < top_rule < T , id_type , id_type::parser_combinator_parser_decl_rule_ids_begin > >
+		{
+			static auto func ( ) -> std::shared_ptr < term < id_type > >
+			{
+				return get_detail_top_rule < id_type , id_type::parser_combinator_parser_decl_rule_ids_begin > ( ) ;
+			}
+		} ;
 		template < typename T , typename id_type , id_type id >
 		struct make_LR0_heper < top_rule < T , id_type , id > >
 		{
@@ -414,45 +493,7 @@ namespace parser_combinator
 		template < typename T >
 		auto make_LR0 ( ) -> decltype ( make_LR0_heper < T >::func ( ) )
 		{
-			static_assert ( tmp::size < typename get_top_rules < T >::type >::value == 1 , "top_rule is duplication." ) ;
-			using id_type = get_id
-			<
-				typename tmp::head
-				<
-					typename tmp::to_list
-					<
-						typename get_top_rules < T >::type
-					>::type
-				>::type
-			> ;
-			auto tmp_res = make_LR0_heper < T >::func ( ) ;
-			tmp_res.emplace_front
-			(
-				std::make_pair
-				(
-					get_detail_top_rule < typename id_type::type , id_type::type::parser_combinator_parser_decl_rule_ids_begin > ( ) ,
-					std::list < std::shared_ptr < term < typename id_type::type > > >
-					{
-						get_detail_rule < typename id_type::type , id_type::value > ( )
-					}
-				) ,
-				0
-			) ;
-			decltype ( tmp_res ) res ;
-			for ( auto & elem : tmp_res )
-			{
-				auto index = elem.second ;
-				auto head = elem.first.first ;
-				for ( auto iter = elem.first.second.begin ( ) ; iter != elem.first.second.end ( ) ; ++ iter )
-				{
-					auto pos = elem.first.second.insert ( iter , get_current_read < typename id_type::type > ( ) ) ;
-					res.emplace_back ( std::make_pair ( head , elem.first.second ) , index ) ;
-					elem.first.second.erase ( pos ) ;
-				}
-				elem.first.second.insert ( elem.first.second.end ( ) , get_current_read < typename id_type::type > ( ) ) ;
-				res.emplace_back ( std::make_pair ( head , elem.first.second ) , index ) ;
-			}
-			return res ;
+			return make_LR0_heper < T >::func ( ) ;
 		}
 		template < typename ... rules_type >
 		class parser
@@ -523,6 +564,12 @@ namespace parser_combinator
 			using type = tmp::list < rule_type < T , id_type , id > , typename rule_to_list < rhs_type >::type > ;
 			using function_type = typename assign_to_function < type >::type ;
 			function_type value { assign_to_function < type >::value } ;
+			assign_result ( ) = default ;
+			assign_result ( const assign_result & ) = default ;
+			assign_result ( assign_result && ) = default ;
+			auto operator = ( const assign_result & ) -> assign_result & = default ;
+			auto operator = ( assign_result && ) -> assign_result & = default ;
+			~ assign_result ( ) = default ;
 			auto operator ( ) ( const function_type & function ) -> assign_result & ;
 		} ;
 		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id , typename rhs_type >
@@ -557,6 +604,7 @@ namespace parser_combinator
 			: tmp::list < lhs_type , rhs_type >
 		{
 		} ;
+		struct dummy_type { } ;
 		template < typename lhs_type , typename rhs_type >
 		auto operator >> ( const lhs_type & , const rhs_type & ) -> shift_result < lhs_type , rhs_type >
 		{
@@ -576,7 +624,7 @@ namespace parser_combinator
 		} ;
 		template < typename ... rules_type >
 		parser < rules_type ... >::parser ( const rules_type & ... rules )
-			: rules_ { rules ... }
+			: rules_ { dummy_type { } , rules ... }
 		{
 		}
 		template < typename ... rules_type >
