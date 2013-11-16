@@ -131,6 +131,7 @@ namespace parser_combinator
 		{
 			id_type id_ ;
 		public :
+			using type = id_type ;
 			term ( ) = delete ;
 			term ( const term & ) = default ;
 			term ( term && ) = default ;
@@ -220,7 +221,10 @@ namespace parser_combinator
 			: public term < id_type >
 		{
 		public :
-			current_read ( ) ;
+			current_read ( )
+				: term < id_type > ( static_cast < id_type > ( 0 ) )
+			{
+			}
 			current_read ( const current_read & ) = default ;
 			current_read ( current_read && ) = default ;
 			auto operator = ( const current_read & ) -> current_read & = default ;
@@ -231,11 +235,6 @@ namespace parser_combinator
 				return true ;
 			}
 		} ;
-		template < typename id_type >
-		current_read < id_type >::current_read ( )
-			: term < id_type > ( static_cast < id_type > ( - 1 ) )
-		{
-		}
 		template < typename T , typename id_type >
 		using end_read = terminal < T , id_type , id_type::parser_combinator_parser_decl_rule_ids_end > ;
 		template < typename T >
@@ -493,7 +492,23 @@ namespace parser_combinator
 		template < typename T >
 		auto make_LR0 ( ) -> decltype ( make_LR0_heper < T >::func ( ) )
 		{
-			return make_LR0_heper < T >::func ( ) ;
+			using id_type = typename decltype ( make_LR0_heper < T >::func ( ) )::value_type::first_type::first_type::element_type::type ;
+			auto tmp_res = make_LR0_heper < T >::func ( ) ;
+			decltype ( tmp_res ) res ;
+			for ( auto & elem : tmp_res )
+			{
+				auto index = elem.second ;
+				auto head = elem.first.first ;
+				for ( auto iter = elem.first.second.begin ( ) ; iter != elem.first.second.end ( ) ; ++ iter )
+				{
+					auto pos = elem.first.second.insert ( iter , get_current_read < id_type > ( ) ) ;
+					res.emplace_back ( std::make_pair ( head , elem.first.second ) , index ) ;
+					elem.first.second.erase ( pos ) ;
+				}
+				elem.first.second.insert ( elem.first.second.end ( ) , get_current_read < id_type > ( ) ) ;
+				res.emplace_back ( std::make_pair ( head , elem.first.second ) , index ) ;
+			}
+			return res ;
 		}
 		template < typename ... rules_type >
 		class parser
