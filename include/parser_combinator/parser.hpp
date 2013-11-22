@@ -1,9 +1,16 @@
 #ifndef PARSER_COMBINATOR_PARSER_HPP
 #define PARSER_COMBINATOR_PARSER_HPP
+#include<istream>
+#include<ostream>
+#include<iostream>
+#include<sstream>
 #include<functional>
 #include<tuple>
 #include<memory>
-#include<list>
+#include<vector>
+#include<unordered_map>
+#include<set>
+#include<algorithm>
 #include"TMP/all.hpp"
 #include"TMP/and.hpp"
 #include"TMP/any.hpp"
@@ -56,9 +63,10 @@
 #include"TMP/xor.hpp"
 #include"TMP/zip.hpp"
 #define DECL_RULE_IDS_BEGIN(name) \
-	enum class name \
+	enum class name : int \
 	{ \
-		parser_combinator_parser_decl_rule_ids_begin ,
+		parser_combinator_parser_decl_rule_ids_begin_dummy = -1 , \
+		parser_combinator_parser_decl_rule_ids_begin = 0 ,
 #define DECL_RULE_ID(name) \
 	name ,
 #define DECL_RULE_IDS_END \
@@ -222,7 +230,7 @@ namespace parser_combinator
 		{
 		public :
 			current_read ( )
-				: term < id_type > ( static_cast < id_type > ( 0 ) )
+				: term < id_type > ( id_type::parser_combinator_parser_decl_rule_ids_begin_dummy )
 			{
 			}
 			current_read ( const current_read & ) = default ;
@@ -484,9 +492,9 @@ namespace parser_combinator
 		template < typename ... T >
 		struct make_LR0_heper < tmp::list < T ... > >
 		{
-			static auto func ( ) -> std::list < typename tmp::head < tmp::list < decltype ( make_LR0_heper < T >::func ( ) ) ... > >::type >
+			static auto func ( ) -> std::vector < typename tmp::head < tmp::list < decltype ( make_LR0_heper < T >::func ( ) ) ... > >::type >
 			{
-				return std::list < typename tmp::head < tmp::list < decltype ( make_LR0_heper < T >::func ( ) ) ... > >::type > { make_LR0_heper < T >::func ( ) ... } ;
+				return std::vector < typename tmp::head < tmp::list < decltype ( make_LR0_heper < T >::func ( ) ) ... > >::type > { make_LR0_heper < T >::func ( ) ... } ;
 			}
 		} ;
 		template < typename T >
@@ -503,10 +511,392 @@ namespace parser_combinator
 				{
 					auto pos = elem.first.second.insert ( iter , get_current_read < id_type > ( ) ) ;
 					res.emplace_back ( std::make_pair ( head , elem.first.second ) , index ) ;
-					elem.first.second.erase ( pos ) ;
+					iter = elem.first.second.erase ( pos ) ;
 				}
 				elem.first.second.insert ( elem.first.second.end ( ) , get_current_read < id_type > ( ) ) ;
 				res.emplace_back ( std::make_pair ( head , elem.first.second ) , index ) ;
+			}
+			return res ;
+		}
+		template < typename id_type >
+		using element_type = std::pair
+		<
+			std::pair
+			<
+				std::shared_ptr < term < id_type > > ,
+				std::vector < std::shared_ptr < term < id_type > > >
+			> ,
+			int
+		> ;
+		template < typename id_type >
+		auto make_closure ( const std::set < element_type < id_type > > & I , const std::vector < element_type < id_type > > & env ) -> std::set < element_type < id_type > >
+		{
+			std::set < element_type < id_type > > res = I ;
+			for ( auto & elem : I )
+			{
+				auto body = elem.first.second ;
+				auto iter = std::find ( body.begin ( ) , body.end ( ) , get_current_read < id_type > ( ) );
+				if ( iter != body.end ( ) && ++ iter != body.end ( ) )
+				{
+					for ( auto & env_elem : env )
+					{
+						if ( env_elem.first.first == * iter && * env_elem.first.second.begin ( ) == get_current_read < id_type > ( ) )
+						{
+							res.insert ( env_elem ) ;
+						}
+					}
+				}
+			}
+			if ( res == I )
+			{
+				return res ;
+			}
+			return make_closure ( res , env ) ;
+		}
+		template < typename id_type >
+		auto make_goto ( const std::set < element_type < id_type > > & I , std::shared_ptr < term < id_type > > X , const std::vector < element_type < id_type > > & env ) -> std::set < element_type < id_type > >
+		{
+			std::set < element_type < id_type > > res ;
+			for ( auto & elem : I )
+			{
+				auto body = elem.first.second ;
+				auto iter = std::find ( body.begin ( ) , body.end ( ) , get_current_read < id_type > ( ) );
+				if ( iter != body.end ( ) && ++ iter != body.end ( ) && * iter == X )
+				{
+					auto tmp_iter = iter ;
+					-- tmp_iter ;
+					std::swap ( * iter , * tmp_iter ) ;
+					res.insert ( std::make_pair ( std::make_pair ( elem.first.first , body ) , elem.second ) ) ;
+				}
+			}
+			return make_closure ( res , env ) ;
+		}
+		template < typename id_type >
+		auto make_first_helper ( const std::vector < std::shared_ptr < term < id_type > > > & a , std::set < std::shared_ptr < term < id_type > > > already , const std::vector < element_type < id_type > > & env ) -> std::set < std::shared_ptr < term < id_type > > >
+		{
+			if ( a.size ( ) == 1 && ( * a.begin ( ) )->is_terminal ( ) )
+			{
+				return { * a.begin ( ) } ;
+			}
+			else if ( a.size ( ) == 1 )
+			{
+				std::set < std::shared_ptr < term < id_type > > > res ;
+				already.insert ( * a.begin ( ) ) ;
+				for ( auto & elem : env )
+				{
+					if ( * a.begin ( ) == elem.first.first )
+					{
+						auto tmp = make_first_helper ( elem.first.second , already , env ) ;
+						res.insert ( tmp.begin ( ) , tmp.end ( ) ) ;
+					}
+				}
+				return res ;
+			}
+			else
+			{
+				return make_first_helper ( { * a.begin ( ) } , already , env ) ;
+			}
+		}
+		template < typename id_type >
+		auto make_first ( const std::vector < std::shared_ptr < term < id_type > > > & a , const std::vector < element_type < id_type > > & env ) -> std::set < std::shared_ptr < term < id_type > > >
+		{
+			return make_first_helper ( a , { } , env ) ;
+		}
+		template < typename id_type >
+		auto make_follow_helper ( std::shared_ptr < term < id_type > > A , const std::set < std::shared_ptr < term < id_type > > > & already , const std::vector < element_type < id_type > > & env ) -> std::set < std::shared_ptr < term < id_type > > >
+		{
+			if ( already.find ( A ) != already.end ( ) )
+			{
+				return already ;
+			}
+			auto next_alread = already ;
+			next_alread.insert ( A ) ;
+			std::set < std::shared_ptr < term < id_type > > > res ;
+			for ( auto & elem : env )
+			{
+				std::vector < typename std::vector < std::shared_ptr < term < id_type > > >::const_iterator > iters ;
+				for ( auto iter = elem.first.second.begin ( ) ; iter != elem.first.second.end ( ) ; ++ iter )
+				{
+					if ( A == * iter )
+					{
+						iters.push_back ( iter ) ;
+					}
+				}
+				if ( elem.first.first->is_top_rule ( ) && elem.first.second.size ( ) == 1 && iters.size ( ) == 1 )
+				{
+					res.insert ( get_detail_terminal < id_type , id_type::parser_combinator_parser_decl_rule_ids_end > ( ) ) ;
+				}
+				for ( auto iter : iters )
+				{
+					++ iter ;
+					if ( iter == elem.first.second.end ( ) )
+					{
+						auto tmp = make_follow_helper ( elem.first.first , next_alread , env ) ;
+						res.insert ( tmp.begin ( ) , tmp.end ( ) ) ;
+					}
+					else
+					{
+						auto tmp = make_first ( std::vector < std::shared_ptr < term < id_type > > > ( iter , elem.first.second.end ( ) ) , env ) ;
+						res.insert ( tmp.begin ( ) , tmp.end ( ) ) ;
+					}
+				}
+			}
+			return res ;
+		}
+		template < typename id_type >
+		auto make_follow ( const std::vector < std::shared_ptr < term < id_type > > > & A , const std::vector < element_type < id_type > > & env ) -> std::set < std::shared_ptr < term < id_type > > >
+		{
+			return make_follow_helper ( * A.begin ( ) , { } , env ) ;
+		}
+		template < typename id_type >
+		auto make_closures_helper ( const std::vector < std::set < element_type < id_type > > > & already , const std::set < std::set < element_type < id_type > > > & new_closures , const std::vector < element_type < id_type > > & env ) -> std::vector < std::set < element_type < id_type > > >
+		{
+			std::vector < std::set < element_type < id_type > > > next_already = already ;
+			std::set < std::set < element_type < id_type > > > include_already ;
+			for ( auto & elem : new_closures )
+			{
+				if ( std::find ( already.begin ( ) , already.end ( ) , elem ) == already.end ( ) )
+				{
+					next_already.push_back ( elem ) ;
+					include_already.insert ( elem ) ;
+				}
+			}
+			if ( include_already.empty ( ) )
+			{
+				next_already.erase ( std::remove ( next_already.begin ( ) , next_already.end ( ) , std::set < element_type < id_type > > { } ) , next_already.end ( ) ) ;
+				return next_already ;
+			}
+			std::set < std::set < element_type < id_type > > > next_new_closures ;
+			for ( auto & elem : include_already )
+			{
+				for ( auto & rule : elem )
+				{
+					auto iter = std::find ( rule.first.second.begin ( ) , rule.first.second.end ( ) , get_current_read < id_type > ( ) ) ;
+					++ iter ;
+					if ( iter != rule.first.second.end ( ) )
+					{
+						next_new_closures.insert ( make_goto ( elem , * iter , env ) ) ;
+					}
+				}
+			}
+			return make_closures_helper ( next_already , next_new_closures , env ) ;
+		}
+		template < typename id_type >
+		auto make_closures ( const std::vector < element_type < id_type > > & env ) -> std::vector < std::set < element_type < id_type > > >
+		{
+			return make_closures_helper ( { } , { make_closure ( { * env.begin ( ) } , env ) } , env ) ;
+		}
+		class detail_action_base
+		{
+		public :
+			detail_action_base ( ) = default ;
+			detail_action_base ( const detail_action_base & ) = default ;
+			detail_action_base ( detail_action_base && ) = default ;
+			auto operator = ( const detail_action_base & ) -> detail_action_base & = default ;
+			auto operator = ( detail_action_base && ) -> detail_action_base & = default ;
+			virtual auto get ( ) -> int = 0 ;
+			virtual auto is_error ( ) -> bool
+			{
+				return false ;
+			}
+			virtual auto is_shift ( ) -> bool
+			{
+				return false ;
+			}
+			virtual auto is_reduce ( ) -> bool
+			{
+				return false ;
+			}
+			virtual auto is_accept ( ) -> bool
+			{
+				return false ;
+			}
+			virtual ~ detail_action_base ( )
+			{
+			}
+		} ;
+		class detail_shift
+			: public detail_action_base
+		{
+			int i_ ;
+		public :
+			detail_shift ( ) = delete ;
+			detail_shift ( const detail_shift & ) = default ;
+			detail_shift ( detail_shift && ) = default ;
+			auto operator = ( const detail_shift & ) -> detail_shift & = default ;
+			auto operator = ( detail_shift && ) -> detail_shift & = default ;
+			~ detail_shift ( ) = default ;
+			detail_shift ( int i )
+				: i_ ( i )
+			{
+			}
+			auto is_shift ( ) -> bool override
+			{
+				return true ;
+			}
+			auto get ( ) -> int override
+			{
+				return i_ ;
+			}
+		} ;
+		class detail_reduce
+			: public detail_action_base
+		{
+			int i_ ;
+		public :
+			detail_reduce ( ) = delete ;
+			detail_reduce ( const detail_reduce & ) = default ;
+			detail_reduce ( detail_reduce && ) = default ;
+			auto operator = ( const detail_reduce & ) -> detail_reduce & = default ;
+			auto operator = ( detail_reduce && ) -> detail_reduce & = default ;
+			~ detail_reduce ( ) = default ;
+			detail_reduce ( int i )
+				: i_ ( i )
+			{
+			}
+			auto is_reduce ( ) -> bool override
+			{
+				return true ;
+			}
+			auto get ( ) -> int override
+			{
+				return i_ ;
+			}
+		} ;
+		class detail_accept
+			: public detail_action_base
+		{
+		public :
+			auto is_accept ( ) -> bool override
+			{
+				return true ;
+			}
+			auto get ( ) -> int override
+			{
+				return - 1 ;
+			}
+		} ;
+		class conflict_error
+			: public std::runtime_error
+		{
+		public :
+			using std::runtime_error::runtime_error ;
+		} ;
+		template < typename id_type >
+		auto make_shift_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < std::shared_ptr < term < id_type > > > & components , const std::vector < element_type < id_type > > & env ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
+		{
+			std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > res ;
+			for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
+			{
+				for ( auto component_iter = components.begin ( ) ; component_iter != components.end ( ) ; ++ component_iter )
+				{
+					auto goto_ = make_goto ( * closure_iter , * component_iter , env ) ;
+					res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] = goto_.empty ( ) ? nullptr : std::make_shared < detail_shift > ( ( std::find ( closures.begin ( ) , closures.end ( ) , goto_ ) - closures.begin ( ) ) ) ;
+				}
+			}
+			return res ;
+		}
+		template < typename id_type >
+		auto make_reduce_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < std::shared_ptr < term < id_type > > > & components , const std::vector < element_type < id_type > > & env ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
+		{
+			std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > res ;
+			for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
+			{
+				for ( auto component_iter = components.begin ( ) ; component_iter != components.end ( ) ; ++ component_iter )
+				{
+					auto goto_ = make_goto ( * closure_iter , * component_iter , env ) ;
+					res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] = nullptr ;
+				}
+			}
+			auto tmp_env = env ;
+			for ( auto & elem : tmp_env )
+			{
+				elem.first.second.erase ( std::find ( elem.first.second.begin ( ) , elem.first.second.end ( ) , get_current_read < id_type > ( ) ) ) ;
+			}
+			std::sort ( tmp_env.begin ( ) , tmp_env.end ( ) ) ;
+			tmp_env.erase ( std::unique ( tmp_env.begin ( ) , tmp_env.end ( ) ) , tmp_env.end ( ) ) ;
+			std::unique ( tmp_env.begin ( ) , tmp_env.end ( ) ) ;
+			for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
+			{
+				for ( auto rule_iter = closure_iter->begin ( ) ; rule_iter != closure_iter->end ( ) ; ++ rule_iter )
+				{
+					if ( rule_iter->first.second.back ( )->is_current_read ( ) )
+					{
+						for ( auto & elem : make_follow ( { rule_iter->first.first } , tmp_env ) )
+						{
+							if ( elem->is_terminal ( ) )
+							{
+								auto & elm = res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( elem->get ( ) ) ] ;
+								if ( elm )
+								{
+									std::ostringstream stream ;
+									stream << "reduce/reduce conflict." << std::endl << "    rule:" << elm->get ( ) << std::endl << "    rule:" << rule_iter->second << std::endl ;
+									throw conflict_error { stream.str ( ) } ;
+								}
+								elm = std::make_shared < detail_reduce > ( rule_iter->second ) ;
+							}
+						}
+					}
+				}
+			}
+			return res ;
+		}
+		template < typename id_type >
+		auto make_accept_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < std::shared_ptr < term < id_type > > > & components , const std::vector < element_type < id_type > > & env ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
+		{
+			std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > res ;
+			for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
+			{
+				for ( auto component_iter = components.begin ( ) ; component_iter != components.end ( ) ; ++ component_iter )
+				{
+					auto goto_ = make_goto ( * closure_iter , * component_iter , env ) ;
+					res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] = nullptr ;
+				}
+			}
+			for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
+			{
+				for ( auto rule_iter = closure_iter->begin ( ) ; rule_iter != closure_iter->end ( ) ; ++ rule_iter )
+				{
+					if ( rule_iter->first.first->is_top_rule ( ) && rule_iter->first.second.back ( )->is_current_read ( ) )
+					{
+						res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( components.back ( )->get ( ) ) ] = std::make_shared < detail_accept > ( ) ;
+					}
+				}
+			}
+			return res ;
+		}
+		template < typename id_type >
+		auto make_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < std::shared_ptr < term < id_type > > > & components , const std::vector < element_type < id_type > > & env ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
+		{
+			auto shift_table = make_shift_table ( closures , components , env ) ;
+			auto reduce_table = make_reduce_table ( closures , components , env ) ;
+			auto accept_table = make_accept_table ( closures , components , env ) ;
+			std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > res ;
+			for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
+			{
+				for ( auto component_iter = components.begin ( ) ; component_iter != components.end ( ) ; ++ component_iter )
+				{
+					auto shift_ = shift_table [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] ;
+					auto reduce_ = reduce_table [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] ;
+					auto accept_ = accept_table [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] ;
+					if ( shift_ && ( reduce_ || accept_ ) )
+					{
+						std::ostringstream stream ;
+						stream << "shift/reduce conflict." << std::endl ;
+						std::set < int > rule_nums ;
+						for ( auto & elem : * closure_iter )
+						{
+							rule_nums.insert ( elem.second ) ;
+						}
+						rule_nums.insert ( reduce_ ? reduce_->get ( ) : accept_->get ( ) ) ;
+						for ( auto & elem : rule_nums )
+						{
+							stream << "    rule:" << elem << std::endl ;
+						}
+						throw conflict_error { stream.str ( ) } ;
+					}
+					res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] = shift_ ? shift_ : reduce_ ? reduce_ : accept_ ;
+				}
 			}
 			return res ;
 		}
@@ -519,12 +909,52 @@ namespace parser_combinator
 				tmp::list < > ,
 				rules_type ...
 			>::type ;
-			std::function < void ( ) > fun = [ ] ( )
+			std::function < void ( ) > fun_ = [ ] ( )
 			{
-				auto value = make_LR0
+				const auto LR0s = make_LR0
 				<
 					typename to_rule_list < rules_type_ >::type
 				> ( ) ;
+				using id_type = typename decltype ( LR0s )::value_type::first_type::first_type::element_type::type ;
+				std::set < std::shared_ptr < term < id_type > > > rules ;
+				std::set < std::shared_ptr < term < id_type > > > terminals ;
+				for ( auto & elem : LR0s )
+				{
+					if ( elem.first.first->is_top_rule ( ) || elem.first.first->is_rule ( ) )
+					{
+						rules.insert ( elem.first.first ) ;
+					}
+					else if ( elem.first.first->is_terminal ( ) )
+					{
+						terminals.insert ( elem.first.first ) ;
+					}
+					for ( auto & elm : elem.first.second )
+					{
+						if ( elm->is_top_rule ( ) || elm->is_rule ( ) )
+						{
+							rules.insert ( elm ) ;
+						}
+						else if ( elm->is_terminal ( ) )
+						{
+							terminals.insert ( elm ) ;
+						}
+					}
+				}
+				std::vector < std::shared_ptr < term < id_type > > > components ;
+				components.insert ( components.end ( ) , rules.begin ( ) , rules.end ( ) ) ;
+				components.insert ( components.end ( ) , terminals.begin ( ) , terminals.end ( ) ) ;
+				components.push_back ( get_detail_terminal < id_type , id_type::parser_combinator_parser_decl_rule_ids_end > ( ) ) ;
+				auto closures = make_closures ( LR0s ) ;
+				auto table = make_table ( closures , components , LR0s ) ;
+				for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
+				{
+					for ( auto component_iter = components.begin ( ) ; component_iter != components.end ( ) ; ++ component_iter )
+					{
+						auto & elm = table [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] ;
+						( elm ? std::cout << elm->get ( ) : ( std::cout << "e" ) ) << '\t' ;
+					}
+					std::cout << std::endl ;
+				}
 			} ;
 			rules_type_ rules_ ;
 		public :
@@ -641,6 +1071,7 @@ namespace parser_combinator
 		parser < rules_type ... >::parser ( const rules_type & ... rules )
 			: rules_ { dummy_type { } , rules ... }
 		{
+			fun_ ( ) ;
 		}
 		template < typename ... rules_type >
 		template < typename T , typename id_type >
