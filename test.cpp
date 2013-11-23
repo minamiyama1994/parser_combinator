@@ -68,20 +68,20 @@ auto main ( ) -> int
 	DECL_TERMINAL ( double , id::number_id , number ) ;
 	*/
 	DECL_TOP_RULE ( void * , id::s_id , s ) ;
-	DECL_RULE ( void * , id::pp_id , pp ) ;
-	DECL_RULE ( void * , id::vp_id , vp ) ;
-	DECL_RULE ( void * , id::np_id , np ) ;
-	DECL_TERMINAL ( void * , id::n_id , n ) ;
-	DECL_TERMINAL ( void * , id::p_id , p ) ;
-	DECL_TERMINAL ( void * , id::v_id , v ) ;
-	DECL_TERMINAL ( void * , id::tens_id , tens ) ;
+	DECL_RULE ( char * , id::pp_id , pp ) ;
+	DECL_RULE ( signed char * , id::vp_id , vp ) ;
+	DECL_RULE ( unsigned char * , id::np_id , np ) ;
+	DECL_TERMINAL ( int * , id::n_id , n ) ;
+	DECL_TERMINAL ( unsigned int * , id::p_id , p ) ;
+	DECL_TERMINAL ( float * , id::v_id , v ) ;
+	DECL_TERMINAL ( double * , id::tens_id , tens ) ;
 	auto psr = pp::make_parser
 	(
-		( s = pp >> vp ) ( [ ] ( void * , void * ) { return nullptr ; } ) ,
-		( pp = np >> p ) ( [ ] ( void * , void * ) { return nullptr ; } ) ,
-		( vp = pp >> vp ) ( [ ] ( void * , void * ) { return nullptr ; } ) ,
-		( vp = v >> tens ) ( [ ] ( void * , void * ) { return nullptr ; } ) ,
-		( np = n ) ( [ ] ( void * ) { return nullptr ; } )
+		( s = pp >> vp ) ( [ ] ( char * , signed char * ) { return nullptr ; } ) ,
+		( pp = np >> p ) ( [ ] ( unsigned char * , unsigned int * ) { return nullptr ; } ) ,
+		( vp = pp >> vp ) ( [ ] ( char * , signed char * ) { return nullptr ; } ) ,
+		( vp = v >> tens ) ( [ ] ( float * , double * ) { return nullptr ; } ) ,
+		( np = n ) ( [ ] ( int * ) { return nullptr ; } )
 	/*
 		( expr = term ) ,
 		( expr = expr >> plus_operation >> term ) ( [ ] ( double arg1 , const std::string & , double arg2 ) { return arg1 + arg2 ; } ) ,

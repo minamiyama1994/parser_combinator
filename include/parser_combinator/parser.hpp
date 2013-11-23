@@ -320,7 +320,7 @@ namespace parser_combinator
 		} ;
 		template < typename T1 , typename T2 >
 		struct to_list < assign_result < T1 , T2 > >
-			: tmp::list < T1 , typename T2::type >
+			: assign_result < T1 , T2 >
 		{
 		} ;
 		template < typename T >
@@ -897,6 +897,20 @@ namespace parser_combinator
 			}
 			return res ;
 		}
+		template < typename T >
+		struct get_id_type ;
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
+		struct get_id_type < rule_type < T , id_type , id > >
+			: tmp::integral < id_type , id >
+		{
+		} ;
+		template < typename T >
+		struct get_type ;
+		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
+		struct get_type < rule_type < T , id_type , id > >
+			: tmp::id < T >
+		{
+		} ;
 		template < typename ... rules_type >
 		class parser
 		{
@@ -905,6 +919,46 @@ namespace parser_combinator
 				1 ,
 				tmp::list < > ,
 				rules_type ...
+			>::type ;
+			using type_id_map = typename tmp::to_dict
+			<
+				typename tmp::foldr
+				<
+					tmp::eval < tmp::cons
+					<
+						tmp::eval < tmp::list
+						<
+							get_id_type < tmp::arg < 0 > > ,
+							get_type < tmp::arg < 0 > >
+						> > ,
+						tmp::id < tmp::arg < 1 > >
+					> > ,
+					tmp::list < > ,
+					typename tmp::foldr
+					<
+						tmp::eval < tmp::unique
+						<
+							tmp::append < tmp::arg < 0 > , tmp::arg < 1 > >
+						> > ,
+						tmp::list < > ,
+						typename tmp::map
+						<
+							tmp::eval < tmp::cons
+							<
+								tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
+								tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > >
+							> > ,
+							typename tmp::map
+							<
+								tmp::head < tmp::arg < 0 > > ,
+								typename to_list
+								<
+									typename to_rule_list < rules_type_ >::type
+								>::type
+							>::type
+						>::type
+					>::type
+				>::type
 			>::type ;
 			std::function < void ( ) > fun_ = [ ] ( )
 			{
