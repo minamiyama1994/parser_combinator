@@ -607,7 +607,7 @@ namespace parser_combinator
 		{
 			if ( already.find ( A ) != already.end ( ) )
 			{
-				return already ;
+				return { } ;
 			}
 			auto next_alread = already ;
 			next_alread.insert ( A ) ;
@@ -824,17 +824,14 @@ namespace parser_combinator
 					{
 						for ( auto & elem : make_follow ( { rule_iter->first.first } , tmp_env ) )
 						{
-							if ( elem->is_terminal ( ) )
+							auto & elm = res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( elem->get ( ) ) ] ;
+							if ( elm )
 							{
-								auto & elm = res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( elem->get ( ) ) ] ;
-								if ( elm )
-								{
-									std::ostringstream stream ;
-									stream << "reduce/reduce conflict." << std::endl << "    rule:" << elm->get ( ) << std::endl << "    rule:" << rule_iter->second << std::endl ;
-									throw conflict_error { stream.str ( ) } ;
-								}
-								elm = std::make_shared < detail_reduce > ( rule_iter->second ) ;
+								std::ostringstream stream ;
+								stream << "reduce/reduce conflict." << std::endl << "    rule:" << elm->get ( ) << std::endl << "    rule:" << rule_iter->second << std::endl ;
+								throw conflict_error { stream.str ( ) } ;
 							}
+							elm = std::make_shared < detail_reduce > ( rule_iter->second ) ;
 						}
 					}
 				}
