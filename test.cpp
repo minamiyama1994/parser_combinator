@@ -1,8 +1,8 @@
-//#include"parser_combinator/lexer.hpp"
 #include"parser_combinator/parser.hpp"
-//namespace bx = boost::xpressive ;
-//namespace pl = parser_combinator::lexer ;
 namespace pp = parser_combinator::parser ;
+
+// The declaration of the ID for identifying the elements that make up the BNF.
+// By following this type as before.
 DECL_RULE_IDS_BEGIN ( id )
 	DECL_RULE_ID ( exprs_id )
 	DECL_RULE_ID ( expr_id )
@@ -20,6 +20,8 @@ DECL_RULE_IDS_END
 auto main ( ) -> int
 try
 {
+	// Declaration of the elements that make up the BNF.
+	// DECL_TOP_RULE is exactly one.
 	DECL_TOP_RULE ( void * , id::exprs_id , exprs ) ;
 	DECL_RULE ( double , id::expr_id , expr ) ;
 	DECL_RULE ( double , id::term_id , term ) ;
@@ -32,6 +34,14 @@ try
 	DECL_TERMINAL ( void * , id::rp_id , rp ) ;
 	DECL_TERMINAL ( double , id::number_id , number ) ;
 	DECL_TERMINAL ( void * , id::ln_id , ln ) ;
+	
+	// Construction of BNF.
+	// I want to format "(rule) (semantic action)" of always.
+	// When performing the abbreviation of semantic action, operation can not be guaranteed.
+	// I specify a function object to semantic action.
+	// 
+	// TODO:
+	// I want to change the design to use to force the addition of semantic action in the future.
 	auto psr = pp::make_parser
 	(
 		( exprs = ln ) ( [ ] ( void * ) -> void *
@@ -89,6 +99,11 @@ try
 			return arg ;
 		} )
 	) ;
+	
+	// I do it manually now lexical analysis part because it is not implemented yet.
+	// 
+	// TODO:
+	// Implementation of lexical analysis.
 	std::string str ;
 	for ( std::cout << "> " , std::getline ( std::cin , str ) ; std::cin ; std::getline ( std::cin , str ) )
 	{
@@ -96,6 +111,12 @@ try
 		{
 			if ( * iter == '+' )
 			{
+				
+				// I want to specify that this must be input to the parser.
+				// Plan to provide, such as macros for simplicity in the future.
+				// 
+				// TODO:
+				// Implementation, such as macros for Optional.
 				psr ( nullptr , tmp::integral < id , id::plus_operation_id > { } ) ;
 			}
 			else if ( * iter == '-' )
@@ -134,6 +155,8 @@ try
 		}
 		psr ( nullptr , tmp::integral < id , id::ln_id > { } ) ;
 	}
+	
+	// I want to specify that this is the end of the input.
 	psr.end ( ) ;
 }
 catch ( const std::exception & e )
