@@ -7,10 +7,12 @@
 #include<functional>
 #include<tuple>
 #include<memory>
+#include<stack>
 #include<vector>
 #include<unordered_map>
 #include<set>
 #include<algorithm>
+#include"boost/any.hpp"
 #include"TMP/all.hpp"
 #include"TMP/and.hpp"
 #include"TMP/any.hpp"
@@ -580,6 +582,10 @@ namespace parser_combinator
 			}
 			else if ( a.size ( ) == 1 )
 			{
+				if ( already.find ( * a.begin ( ) ) != already.end ( ) )
+				{
+					return { } ;
+				}
 				std::set < std::shared_ptr < term < id_type > > > res ;
 				already.insert ( * a.begin ( ) ) ;
 				for ( auto & elem : env )
@@ -920,94 +926,97 @@ namespace parser_combinator
 				tmp::list < > ,
 				rules_type ...
 			>::type ;
-			using type_id_map = typename tmp::to_dict
+			using id_type = typename get_id
 			<
-				typename tmp::foldr
+				typename tmp::head
 				<
-					tmp::eval < tmp::cons
+					typename tmp::head
 					<
-						tmp::eval < tmp::list
+						typename tmp::head
 						<
-							get_id_type < tmp::arg < 0 > > ,
-							get_type < tmp::arg < 0 > >
-						> > ,
-						tmp::id < tmp::arg < 1 > >
-					> > ,
-					tmp::list < > ,
+							typename to_list
+							<
+								typename to_rule_list < rules_type_ >::type
+							>::type
+						>::type
+					>::type
+				>::type
+			>::type ;
+			using type_id_map = typename tmp::insert_dict
+			<
+				typename get_id_type < end_read < void * , id_type > >::type ,
+				void * ,
+				typename tmp::to_dict
+				<
 					typename tmp::foldr
 					<
-						tmp::eval < tmp::unique
+						tmp::eval < tmp::cons
 						<
-							tmp::append < tmp::arg < 0 > , tmp::arg < 1 > >
+							tmp::eval < tmp::list
+							<
+								get_id_type < tmp::arg < 0 > > ,
+								get_type < tmp::arg < 0 > >
+							> > ,
+							tmp::id < tmp::arg < 1 > >
 						> > ,
 						tmp::list < > ,
-						typename tmp::map
+						typename tmp::foldr
 						<
-							tmp::eval < tmp::cons
+							tmp::eval < tmp::unique
 							<
-								tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
-								tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > >
+								tmp::append < tmp::arg < 0 > , tmp::arg < 1 > >
 							> > ,
+							tmp::list < > ,
 							typename tmp::map
 							<
-								tmp::head < tmp::arg < 0 > > ,
-								typename to_list
+								tmp::eval < tmp::cons
 								<
-									typename to_rule_list < rules_type_ >::type
+									tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
+									tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > >
+								> > ,
+								typename tmp::map
+								<
+									tmp::head < tmp::arg < 0 > > ,
+									typename to_list
+									<
+										typename to_rule_list < rules_type_ >::type
+									>::type
 								>::type
 							>::type
 						>::type
 					>::type
 				>::type
 			>::type ;
-			std::function < void ( ) > fun_ = [ ] ( )
+			std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > table_ = [ ] ( ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
 			{
 				const auto LR0s = make_LR0
 				<
 					typename to_rule_list < rules_type_ >::type
 				> ( ) ;
-				using id_type = typename decltype ( LR0s )::value_type::first_type::first_type::element_type::type ;
-				std::set < std::shared_ptr < term < id_type > > > rules ;
-				std::set < std::shared_ptr < term < id_type > > > terminals ;
+				using id_type_ = typename decltype ( LR0s )::value_type::first_type::first_type::element_type::type ;
+				std::set < std::shared_ptr < term < id_type_ > > > pre_components ;
 				for ( auto & elem : LR0s )
 				{
-					if ( elem.first.first->is_top_rule ( ) || elem.first.first->is_rule ( ) )
+					if ( ! elem.first.first->is_current_read ( ) )
 					{
-						rules.insert ( elem.first.first ) ;
-					}
-					else if ( elem.first.first->is_terminal ( ) )
-					{
-						terminals.insert ( elem.first.first ) ;
+						pre_components.insert ( elem.first.first ) ;
 					}
 					for ( auto & elm : elem.first.second )
 					{
-						if ( elm->is_top_rule ( ) || elm->is_rule ( ) )
+						if ( ! elm->is_current_read ( ) )
 						{
-							rules.insert ( elm ) ;
-						}
-						else if ( elm->is_terminal ( ) )
-						{
-							terminals.insert ( elm ) ;
+							pre_components.insert ( elm ) ;
 						}
 					}
 				}
-				std::vector < std::shared_ptr < term < id_type > > > components ;
-				components.insert ( components.end ( ) , rules.begin ( ) , rules.end ( ) ) ;
-				components.insert ( components.end ( ) , terminals.begin ( ) , terminals.end ( ) ) ;
-				components.push_back ( get_detail_terminal < id_type , id_type::parser_combinator_parser_decl_rule_ids_end > ( ) ) ;
+				std::vector < std::shared_ptr < term < id_type_ > > > components ( pre_components.begin ( ) , pre_components.end ( ) ) ;
+				components.push_back ( get_detail_terminal < id_type_ , id_type_::parser_combinator_parser_decl_rule_ids_end > ( ) ) ;
 				auto closures = make_closures ( LR0s ) ;
-				auto table = make_table ( closures , components , LR0s ) ;
-				for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
-				{
-					for ( auto component_iter = components.begin ( ) ; component_iter != components.end ( ) ; ++ component_iter )
-					{
-						auto & elm = table [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] ;
-						( elm ? std::cout << elm->get ( ) : ( std::cout << "e" ) ) << '\t' ;
-					}
-					std::cout << std::endl ;
-				}
-			} ;
+				return make_table ( closures , components , LR0s ) ;
+			} ( ) ;
 			rules_type_ rules_ ;
+			std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > stack_ { { std::make_tuple ( 0 , nullptr , boost::any { } ) } } ;
+			int state_ { 0 } ;
 		public :
 			parser ( ) = delete ;
 			parser ( const parser & ) = delete ;
@@ -1016,8 +1025,9 @@ namespace parser_combinator
 			auto operator = ( parser && ) -> parser & = default ;
 			~ parser ( ) = default ;
 			parser ( const rules_type & ... rules ) ;
-			template < typename T , typename id_type >
-			auto operator ( ) ( const T & value , id_type id ) -> parser & ;
+			template < typename id_type_ , id_type_ id >
+			auto operator ( ) ( const typename tmp::lookup < tmp::integral < id_type_ , id > , type_id_map >::type & value , tmp::integral < id_type_ , id > id_ ) -> parser & ;
+			auto end ( ) -> parser & ;
 		} ;
 		template < typename head_type , typename ... tail_type >
 		struct assign_to_function < tmp::list < head_type , tmp::list < tail_type ... > > >
@@ -1118,17 +1128,167 @@ namespace parser_combinator
 		{
 			return assign_result < rule , rhs_type > { } ;
 		} ;
+		class parse_error
+			: public std::runtime_error
+		{
+		public :
+			using std::runtime_error::runtime_error ;
+		} ;
+		template < int ... N >
+		struct index_tuple ;
+		template < int N1 , typename it >
+		struct make_index_tuple_helper ;
+		template < int N1 , int ... Ns >
+		struct make_index_tuple_helper < N1 , index_tuple < Ns ... > >
+		{
+			using type = index_tuple < N1 , Ns ... > ;
+		} ;
+		template < int N1 , int N2 >
+		struct make_index_tuple
+			: make_index_tuple_helper < N1 , typename make_index_tuple < N1 + 1 , N2 >::type >
+		{
+		} ;
+		template < int N1 >
+		struct make_index_tuple < N1 , N1 >
+		{
+			using type = index_tuple < > ;
+		} ;
+		template < typename it , typename tuple >
+		struct tuple_tail_impl ;
+		template < int ... N , typename T1 , typename ... T >
+		struct tuple_tail_impl < index_tuple < N ... > , std::tuple < T1 , T ... > >
+		{
+			static auto func ( const std::tuple < T1 , T ... > & tuple ) -> std::tuple < T ... >
+			{
+				return std::tie ( std::get < N > ( tuple ) ... ) ;
+			}
+		} ;
+		template < typename T1 , typename ... T >
+		auto tuple_tail ( const std::tuple < T1 , T ... > & tuple ) -> std::tuple < T ... >
+		{
+			return tuple_tail_impl < typename make_index_tuple < 1 , sizeof ... ( T ) + 1 >::type , std::tuple < T1 , T ... > >::func ( tuple ) ;
+		}
+		template < typename it , typename F , typename ... T >
+		struct tuple_apply_helper ;
+		template < int ... N , typename R , typename T1 , typename ... T , typename T1_ , typename ... T_ >
+		struct tuple_apply_helper < index_tuple < N ... > , std::function < R ( T1 , T ... ) > , T1_ , T_ ... >
+		{
+			static auto func ( std::function < R ( T1 , T ... ) > fun , const T1_ & t1 , const std::tuple < T_ ... > & t ) -> R
+			{
+				return fun ( t1 , std::get < N > ( t ) ... ) ;
+			}
+		} ;
+		template < typename R , typename T1 , typename ... T , typename T1_ , typename ... T_ >
+		auto tuple_apply ( std::function < R ( T1 , T ... ) > fun , const T1_ & t1 , const std::tuple < T_ ... > & t ) -> R
+		{
+			return tuple_apply_helper < typename make_index_tuple < 0 , sizeof ... ( T_ ) >::type , std::function < R ( T1 , T ... ) > , T1_ , T_ ... >::func ( fun , t1 , t ) ;
+		}
+		template < typename id_type , typename R , typename T1 , typename ... T >
+		struct apply_impl ;
+		template < typename id_type , typename R , typename T1 , typename ... T >
+		struct apply_impl
+		{
+			static auto func ( std::function < R ( T1 , T ... ) > fun , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack ) -> R
+			{
+				auto new_fun = [ & ] ( const T & ... t )
+				{
+					auto ts = std::tie ( t ... ) ;
+					return [ & , ts ] ( const T1 & t1 )
+					{
+						return tuple_apply ( fun , t1 , ts ) ;
+					} ;
+				} ;
+				auto f = apply_impl < id_type , std::function < R ( T1 ) > , T ... >::func ( new_fun , stack ) ;
+				auto res = f ( boost::any_cast < T1 > ( std::get < 2 > ( stack.top ( ) ) ) ) ;
+				stack.pop ( ) ;
+				return res ;
+			}
+		} ;
+		template < typename id_type , typename R , typename T >
+		struct apply_impl < id_type , R , T >
+		{
+			static auto func ( std::function < R ( T ) > fun , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack ) -> R
+			{
+				auto res = fun ( boost::any_cast < T > ( std::get < 2 > ( stack.top ( ) ) ) ) ;
+				stack.pop ( ) ;
+				return res ;
+			}
+		} ;
+		template < typename id_type , typename R , typename ... T >
+		auto apply ( std::function < R ( T ... ) > fun , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack ) -> R
+		{
+			return apply_impl < id_type , R , T ... >::func ( fun , stack ) ;
+		}
+		template < typename id_type , typename rule_list >
+		struct do_reduce_impl ;
+		template < typename id_type , typename T , int N , typename ... rule_list >
+		struct do_reduce_impl < id_type , std::tuple < first_only_tuple < T , tmp::integral < int , N > > , rule_list ... > >
+		{
+			static auto func ( const std::tuple < first_only_tuple < T , tmp::integral < int , N > > , rule_list ... > & rules , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack , std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > & table , int n ) -> int
+			{
+				if ( n == N )
+				{
+					auto push_value = apply < id_type > ( std::get < 0 > ( std::get < 0 > ( rules ) ).value , stack ) ;
+					auto state = std::get < 0 > ( stack.top ( ) ) ;
+					using rule_id = typename get_id_type < typename tmp::head < typename T::type >::type >::type ;
+					auto goto_ = table [ state ] [ static_cast < int > ( rule_id::value ) ] ;
+					if ( ! goto_ )
+					{
+						throw parse_error { "parse error" } ;
+					}
+					stack.push ( std::make_tuple ( goto_->get ( ) , make_LR0_heper < top_rule < void * , id_type , rule_id::value > >::func ( ) , push_value ) ) ;
+					state = goto_->get ( ) ;
+					return state ;
+				}
+				else
+				{
+					return do_reduce_impl < id_type , std::tuple < rule_list ... > >::func ( tuple_tail ( rules ) , stack , table , n ) ;
+				}
+			}
+		} ;
+		template < typename id_type >
+		struct do_reduce_impl < id_type , std::tuple < > >
+		{
+			static auto func ( const std::tuple < > & , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & , std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > & , int ) -> int
+			{
+				throw parse_error { "parse error" } ;
+			}
+		} ;
+		template < typename id_type , typename ... T >
+		auto do_reduce ( const std::tuple < T ... > & rules , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack , std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > & table , int n ) -> int
+		{
+			return do_reduce_impl < id_type , std::tuple < T ... > >::func ( rules , stack , table , n ) ;
+		}
 		template < typename ... rules_type >
 		parser < rules_type ... >::parser ( const rules_type & ... rules )
 			: rules_ { dummy_type { } , rules ... }
 		{
-			fun_ ( ) ;
 		}
 		template < typename ... rules_type >
-		template < typename T , typename id_type >
-		auto parser < rules_type ... >::operator ( ) ( const T & value , id_type id ) -> parser &
+		template < typename id_type_ , id_type_ id >
+		auto parser < rules_type ... >::operator ( ) ( const typename tmp::lookup < tmp::integral < id_type_ , id > , type_id_map >::type & value , tmp::integral < id_type_ , id > id_ ) -> parser &
 		{
+			auto & elm = table_ [ state_ ] [ static_cast < int > ( id ) ] ;
+			if ( ! elm )
+			{
+				throw parse_error { "parse error" } ;
+			}
+			else if ( elm->is_shift ( ) )
+			{
+				stack_.push ( std::make_tuple ( elm->get ( ) , make_LR0_heper < top_rule < void * , id_type , id > >::func ( ) , value ) ) ;
+				state_ = elm->get ( ) ;
+			}
+			else if ( elm->is_reduce ( ) )
+			{
+				state_ = do_reduce < id_type > ( rules_ , stack_ ,table_ , elm->get ( ) ) ;
+				return ( * this ) ( value , id_ ) ;
+			}
 			return * this ;
+		}
+		template < typename ... rules_type >
+		auto parser < rules_type ... >::end ( ) -> parser &
+		{
+			return ( * this ) ( nullptr , tmp::integral < id_type , id_type::parser_combinator_parser_decl_rule_ids_end > { } ) ;
 		}
 		template < typename ... rules_type >
 		auto make_parser ( const rules_type & ... rules ) -> parser < rules_type ... >
