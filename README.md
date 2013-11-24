@@ -2,7 +2,7 @@
 
 ## Motivation
 
-There is a boost :: split the famous parser EDSL, but this is a LL parser, it is not possible to perform the analysis of the LR grammar.
+There is a boost::split the famous parser EDSL, but this is a LL parser, it is not possible to perform the analysis of the LR grammar.
 
 In addition, it is too complicated To use easily.
 
