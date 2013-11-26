@@ -40,7 +40,6 @@
 #include"TMP/if_c.hpp"
 #include"TMP/init.hpp"
 #include"TMP/insert.hpp"
-#include"TMP/insert_dict.hpp"
 #include"TMP/integral.hpp"
 #include"TMP/intersection.hpp"
 #include"TMP/lambda.hpp"
@@ -942,7 +941,7 @@ namespace parser_combinator
 					>::type
 				>::type
 			>::type ;
-			using type_id_map = typename tmp::insert_dict
+			using type_id_map = typename tmp::insert
 			<
 				typename get_id_type < end_read < void * , id_type > >::type ,
 				void * ,
