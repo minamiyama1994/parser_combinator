@@ -1,3 +1,19 @@
+/*  Parser combinator Library
+ *  Copyright (C) 2013  Masakazu Minamiyama
+ *  
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *  
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *  
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #ifndef PARSER_COMBINATOR_PARSER_HPP
 #define PARSER_COMBINATOR_PARSER_HPP
 #include<istream>
@@ -13,56 +29,24 @@
 #include<set>
 #include<algorithm>
 #include"boost/any.hpp"
-#include"TMP/all.hpp"
-#include"TMP/and.hpp"
-#include"TMP/any.hpp"
-#include"TMP/append.hpp"
-#include"TMP/at.hpp"
-#include"TMP/complement.hpp"
-#include"TMP/composite.hpp"
-#include"TMP/concat.hpp"
-#include"TMP/cons.hpp"
-#include"TMP/delete.hpp"
-#include"TMP/dict.hpp"
-#include"TMP/elem.hpp"
-#include"TMP/empty.hpp"
-#include"TMP/equal.hpp"
-#include"TMP/eval.hpp"
-#include"TMP/eval_if.hpp"
-#include"TMP/eval_if_c.hpp"
-#include"TMP/filter.hpp"
-#include"TMP/find.hpp"
-#include"TMP/foldl.hpp"
-#include"TMP/foldr.hpp"
-#include"TMP/head.hpp"
-#include"TMP/id.hpp"
-#include"TMP/if.hpp"
-#include"TMP/if_c.hpp"
-#include"TMP/init.hpp"
-#include"TMP/insert.hpp"
-#include"TMP/integral.hpp"
-#include"TMP/intersection.hpp"
-#include"TMP/lambda.hpp"
-#include"TMP/last.hpp"
-#include"TMP/list.hpp"
-#include"TMP/lookup.hpp"
-#include"TMP/map.hpp"
-#include"TMP/nand.hpp"
-#include"TMP/not.hpp"
-#include"TMP/or.hpp"
-#include"TMP/print.hpp"
-#include"TMP/set.hpp"
-#include"TMP/size.hpp"
-#include"TMP/symmetric_difference.hpp"
-#include"TMP/tail.hpp"
-#include"TMP/to_dict.hpp"
-#include"TMP/to_list.hpp"
-#include"TMP/to_set.hpp"
-#include"TMP/typed_map.hpp"
-#include"TMP/union.hpp"
-#include"TMP/unique.hpp"
-#include"TMP/xor.hpp"
-#include"TMP/zip.hpp"
+#include"FTMP/append.hpp"
+#include"FTMP/at.hpp"
+#include"FTMP/cons.hpp"
+#include"FTMP/eval.hpp"
+#include"FTMP/filter.hpp"
+#include"FTMP/foldr.hpp"
+#include"FTMP/head.hpp"
+#include"FTMP/id.hpp"
+#include"FTMP/insert.hpp"
+#include"FTMP/integral.hpp"
+#include"FTMP/list.hpp"
+#include"FTMP/lookup.hpp"
+#include"FTMP/map.hpp"
+#include"FTMP/size.hpp"
+#include"FTMP/to_dict.hpp"
+#include"FTMP/to_list.hpp"
+#include"FTMP/to_set.hpp"
+#include"FTMP/unique.hpp"
 #define DECL_RULE_IDS_BEGIN(name) \
 	enum class name : int \
 	{ \
@@ -281,20 +265,20 @@ namespace parser_combinator
 		template < int index , typename type_tuple , typename ... args_type >
 		struct make_rules_helper ;
 		template < int index , typename ... type_in_tuple >
-		struct make_rules_helper < index , tmp::list < type_in_tuple ... > >
+		struct make_rules_helper < index , ftmp::list < type_in_tuple ... > >
 		{
 			using type = std::tuple < type_in_tuple ... > ;
 		} ;
 		template < int index , typename ... type_in_tuple , typename args_head , typename ... args_type >
-		struct make_rules_helper < index , tmp::list < type_in_tuple ... > , args_head , args_type ... >
-			: make_rules_helper < index + 1 , tmp::list < type_in_tuple ... , first_only_tuple < args_head , tmp::integral < int , index > > > , args_type ... >
+		struct make_rules_helper < index , ftmp::list < type_in_tuple ... > , args_head , args_type ... >
+			: make_rules_helper < index + 1 , ftmp::list < type_in_tuple ... , first_only_tuple < args_head , ftmp::integral < int , index > > > , args_type ... >
 		{
 		} ;
 		template < typename T >
 		struct to_rule_list ;
 		template < typename ... list >
 		struct to_rule_list < std::tuple < list ... > >
-			: tmp::list < typename to_rule_list < list >::type ... >
+			: ftmp::list < typename to_rule_list < list >::type ... >
 		{
 		} ;
 		template < typename T1 , typename T2 >
@@ -310,13 +294,13 @@ namespace parser_combinator
 		template < typename T >
 		struct to_list ;
 		template < typename ... list >
-		struct to_list < tmp::list < list ... > >
-			: tmp::list < typename to_list < list >::type ... >
+		struct to_list < ftmp::list < list ... > >
+			: ftmp::list < typename to_list < list >::type ... >
 		{
 		} ;
 		template < typename T1 , typename T2 >
 		struct to_list < first_only_tuple < T1 , T2 > >
-			: tmp::list < typename to_list < T1 >::type , T2 >
+			: ftmp::list < typename to_list < T1 >::type , T2 >
 		{
 		} ;
 		template < typename T1 , typename T2 >
@@ -326,51 +310,51 @@ namespace parser_combinator
 		} ;
 		template < typename T >
 		struct is_top_rule
-			: tmp::integral < bool , false >
+			: ftmp::integral < bool , false >
 		{
 		} ;
 		template < typename T , typename id_type , id_type id >
 		struct is_top_rule < top_rule < T , id_type , id > >
-			: tmp::integral < bool , true >
+			: ftmp::integral < bool , true >
 		{
 		} ;
 		template < typename T >
 		struct get_top_rule
-			: tmp::head
+			: ftmp::head
 			<
-				typename tmp::to_list
+				typename ftmp::to_list
 				<
-					typename tmp::filter
+					typename ftmp::filter
 					<
-						is_top_rule < tmp::arg < 0 > > ,
-						typename tmp::map
+						is_top_rule < ftmp::arg < 0 > > ,
+						typename ftmp::map
 						<
-							tmp::eval < tmp::at
+							ftmp::eval < ftmp::at
 							<
-								tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
-								tmp::integral < int , 0 >
+								ftmp::at < ftmp::arg < 0 > , ftmp::integral < int , 0 > > ,
+								ftmp::integral < int , 0 >
 							> > ,
-							typename tmp::to_set < typename to_list < T >::type >::type
+							typename ftmp::to_set < typename to_list < T >::type >::type
 						>::type
 					>::type
 				>::type
 			>::type
 		{
-			static_assert ( tmp::size
+			static_assert ( ftmp::size
 			<
-				typename tmp::to_list
+				typename ftmp::to_list
 				<
-					typename tmp::filter
+					typename ftmp::filter
 					<
-						is_top_rule < tmp::arg < 0 > > ,
-						typename tmp::map
+						is_top_rule < ftmp::arg < 0 > > ,
+						typename ftmp::map
 						<
-							tmp::eval < tmp::at
+							ftmp::eval < ftmp::at
 							<
-								tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
-								tmp::integral < int , 0 >
+								ftmp::at < ftmp::arg < 0 > , ftmp::integral < int , 0 > > ,
+								ftmp::integral < int , 0 >
 							> > ,
-							typename tmp::to_set < typename to_list < T >::type >::type
+							typename ftmp::to_set < typename to_list < T >::type >::type
 						>::type
 					>::type
 				>::type
@@ -390,7 +374,7 @@ namespace parser_combinator
 						top_rule < T , id_type , id_type::parser_combinator_parser_decl_rule_ids_begin > ,
 						rule < T , id_type , id >
 					> ,
-					tmp::integral < int , 0 >
+					ftmp::integral < int , 0 >
 				> ,
 				type_tuple ...
 			> ;
@@ -475,8 +459,8 @@ namespace parser_combinator
 		template < typename T1 , typename T2 >
 		struct make_LR0_heper < assign_result < T1 , T2 > >
 		{
-			using head_type = typename tmp::at < typename assign_result < T1 , T2 >::type , tmp::integral < int , 0 > >::type ;
-			using body_type = typename tmp::at < typename assign_result < T1 , T2 >::type , tmp::integral < int , 1 > >::type ;
+			using head_type = typename ftmp::at < typename assign_result < T1 , T2 >::type , ftmp::integral < int , 0 > >::type ;
+			using body_type = typename ftmp::at < typename assign_result < T1 , T2 >::type , ftmp::integral < int , 1 > >::type ;
 			static auto func ( ) -> decltype ( std::make_pair ( make_LR0_heper < head_type >::func ( ) , make_LR0_heper < body_type >::func ( ) ) )
 			{
 				return std::make_pair ( make_LR0_heper < head_type >::func ( ) , make_LR0_heper < body_type >::func ( ) ) ;
@@ -491,11 +475,11 @@ namespace parser_combinator
 			}
 		} ;
 		template < typename ... T >
-		struct make_LR0_heper < tmp::list < T ... > >
+		struct make_LR0_heper < ftmp::list < T ... > >
 		{
-			static auto func ( ) -> std::vector < typename tmp::head < tmp::list < decltype ( make_LR0_heper < T >::func ( ) ) ... > >::type >
+			static auto func ( ) -> std::vector < typename ftmp::head < ftmp::list < decltype ( make_LR0_heper < T >::func ( ) ) ... > >::type >
 			{
-				return std::vector < typename tmp::head < tmp::list < decltype ( make_LR0_heper < T >::func ( ) ) ... > >::type > { make_LR0_heper < T >::func ( ) ... } ;
+				return std::vector < typename ftmp::head < ftmp::list < decltype ( make_LR0_heper < T >::func ( ) ) ... > >::type > { make_LR0_heper < T >::func ( ) ... } ;
 			}
 		} ;
 		template < typename T >
@@ -906,14 +890,14 @@ namespace parser_combinator
 		struct get_id_type ;
 		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
 		struct get_id_type < rule_type < T , id_type , id > >
-			: tmp::integral < id_type , id >
+			: ftmp::integral < id_type , id >
 		{
 		} ;
 		template < typename T >
 		struct get_type ;
 		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
 		struct get_type < rule_type < T , id_type , id > >
-			: tmp::id < T >
+			: ftmp::id < T >
 		{
 		} ;
 		template < typename ... rules_type >
@@ -922,16 +906,16 @@ namespace parser_combinator
 			using rules_type_ = typename make_rules
 			<
 				1 ,
-				tmp::list < > ,
+				ftmp::list < > ,
 				rules_type ...
 			>::type ;
 			using id_type = typename get_id
 			<
-				typename tmp::head
+				typename ftmp::head
 				<
-					typename tmp::head
+					typename ftmp::head
 					<
-						typename tmp::head
+						typename ftmp::head
 						<
 							typename to_list
 							<
@@ -941,41 +925,41 @@ namespace parser_combinator
 					>::type
 				>::type
 			>::type ;
-			using type_id_map = typename tmp::insert
+			using type_id_map = typename ftmp::insert
 			<
 				typename get_id_type < end_read < void * , id_type > >::type ,
 				void * ,
-				typename tmp::to_dict
+				typename ftmp::to_dict
 				<
-					typename tmp::foldr
+					typename ftmp::foldr
 					<
-						tmp::eval < tmp::cons
+						ftmp::eval < ftmp::cons
 						<
-							tmp::eval < tmp::list
+							ftmp::eval < ftmp::list
 							<
-								get_id_type < tmp::arg < 0 > > ,
-								get_type < tmp::arg < 0 > >
+								get_id_type < ftmp::arg < 0 > > ,
+								get_type < ftmp::arg < 0 > >
 							> > ,
-							tmp::id < tmp::arg < 1 > >
+							ftmp::id < ftmp::arg < 1 > >
 						> > ,
-						tmp::list < > ,
-						typename tmp::foldr
+						ftmp::list < > ,
+						typename ftmp::foldr
 						<
-							tmp::eval < tmp::unique
+							ftmp::eval < ftmp::unique
 							<
-								tmp::append < tmp::arg < 0 > , tmp::arg < 1 > >
+								ftmp::append < ftmp::arg < 0 > , ftmp::arg < 1 > >
 							> > ,
-							tmp::list < > ,
-							typename tmp::map
+							ftmp::list < > ,
+							typename ftmp::map
 							<
-								tmp::eval < tmp::cons
+								ftmp::eval < ftmp::cons
 								<
-									tmp::at < tmp::arg < 0 > , tmp::integral < int , 0 > > ,
-									tmp::at < tmp::arg < 0 > , tmp::integral < int , 1 > >
+									ftmp::at < ftmp::arg < 0 > , ftmp::integral < int , 0 > > ,
+									ftmp::at < ftmp::arg < 0 > , ftmp::integral < int , 1 > >
 								> > ,
-								typename tmp::map
+								typename ftmp::map
 								<
-									tmp::head < tmp::arg < 0 > > ,
+									ftmp::head < ftmp::arg < 0 > > ,
 									typename to_list
 									<
 										typename to_rule_list < rules_type_ >::type
@@ -1025,17 +1009,17 @@ namespace parser_combinator
 			~ parser ( ) = default ;
 			parser ( const rules_type & ... rules ) ;
 			template < typename id_type_ , id_type_ id >
-			auto operator ( ) ( const typename tmp::lookup < tmp::integral < id_type_ , id > , type_id_map >::type & value , tmp::integral < id_type_ , id > id_ ) -> parser & ;
+			auto operator ( ) ( const typename ftmp::lookup < ftmp::integral < id_type_ , id > , type_id_map >::type & value , ftmp::integral < id_type_ , id > id_ ) -> parser & ;
 			auto end ( ) -> parser & ;
 		} ;
 		template < typename head_type , typename ... tail_type >
-		struct assign_to_function < tmp::list < head_type , tmp::list < tail_type ... > > >
+		struct assign_to_function < ftmp::list < head_type , ftmp::list < tail_type ... > > >
 		{
 			using type = std::function < typename get_value_type < head_type >::type ( const typename get_value_type < tail_type >::type & ... ) > ;
 			static type value ;
 		} ;
 		template < typename head_type , typename ... tail_type >
-		typename assign_to_function < tmp::list < head_type , tmp::list < tail_type ... > > >::type assign_to_function < tmp::list < head_type , tmp::list < tail_type ... > > >::value = [ ] ( const typename get_value_type < tail_type >::type & ... ) { return typename get_value_type < head_type >::type { } ; } ;
+		typename assign_to_function < ftmp::list < head_type , ftmp::list < tail_type ... > > >::type assign_to_function < ftmp::list < head_type , ftmp::list < tail_type ... > > >::value = [ ] ( const typename get_value_type < tail_type >::type & ... ) { return typename get_value_type < head_type >::type { } ; } ;
 		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id >
 		struct get_value_type < rule_type < T , id_type , id > >
 		{
@@ -1051,7 +1035,7 @@ namespace parser_combinator
 		struct rule_to_list ;
 		template < template < typename T , typename id_type , id_type id > class rule_type , typename T , typename id_type , id_type id >
 		struct rule_to_list < rule_type < T , id_type , id > >
-			: tmp::list < rule_type < T , id_type , id > >
+			: ftmp::list < rule_type < T , id_type , id > >
 		{
 		} ;
 		template < typename lhs_type , typename rhs_type >
@@ -1066,7 +1050,7 @@ namespace parser_combinator
 		template < template < typename T_ , typename id_type_ , id_type_ id_ > class rule_type , typename T , typename id_type , id_type id , typename rhs_type >
 		struct assign_result < rule_type < T , id_type , id > , rhs_type >
 		{
-			using type = tmp::list < rule_type < T , id_type , id > , typename rule_to_list < rhs_type >::type > ;
+			using type = ftmp::list < rule_type < T , id_type , id > , typename rule_to_list < rhs_type >::type > ;
 			using function_type = typename assign_to_function < type >::type ;
 			function_type value { assign_to_function < type >::value } ;
 			assign_result ( ) = default ;
@@ -1091,22 +1075,22 @@ namespace parser_combinator
 		struct shift_result < assign_result < lhs_lhs_type , lhs_rhs_type > , assign_result < rhs_lhs_type , rhs_rhs_type > > ;
 		template < typename lhs_type , typename rhs_lhs_type , typename rhs_rhs_type >
 		struct shift_result < lhs_type , shift_result < rhs_lhs_type , rhs_rhs_type > >
-			: tmp::cons < lhs_type , typename shift_result < rhs_lhs_type , rhs_rhs_type >::type >
+			: ftmp::cons < lhs_type , typename shift_result < rhs_lhs_type , rhs_rhs_type >::type >
 		{
 		} ;
 		template < typename lhs_lhs_type , typename lhs_rhs_type , typename rhs_type >
 		struct shift_result < shift_result < lhs_lhs_type , lhs_rhs_type > , rhs_type >
-			: tmp::append < typename shift_result < lhs_lhs_type , lhs_rhs_type >::type , tmp::list < rhs_type > >
+			: ftmp::append < typename shift_result < lhs_lhs_type , lhs_rhs_type >::type , ftmp::list < rhs_type > >
 		{
 		} ;
 		template < typename lhs_lhs_type , typename lhs_rhs_type , typename rhs_lhs_type , typename rhs_rhs_type >
 		struct shift_result < shift_result < lhs_lhs_type , lhs_rhs_type > , shift_result < rhs_lhs_type , rhs_rhs_type > >
-			: tmp::append < typename shift_result < lhs_lhs_type , lhs_rhs_type >::type , typename shift_result < rhs_lhs_type , rhs_rhs_type >::type >
+			: ftmp::append < typename shift_result < lhs_lhs_type , lhs_rhs_type >::type , typename shift_result < rhs_lhs_type , rhs_rhs_type >::type >
 		{
 		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct shift_result
-			: tmp::list < lhs_type , rhs_type >
+			: ftmp::list < lhs_type , rhs_type >
 		{
 		} ;
 		struct dummy_type { } ;
@@ -1221,15 +1205,15 @@ namespace parser_combinator
 		template < typename id_type , typename rule_list >
 		struct do_reduce_impl ;
 		template < typename id_type , typename T , int N , typename ... rule_list >
-		struct do_reduce_impl < id_type , std::tuple < first_only_tuple < T , tmp::integral < int , N > > , rule_list ... > >
+		struct do_reduce_impl < id_type , std::tuple < first_only_tuple < T , ftmp::integral < int , N > > , rule_list ... > >
 		{
-			static auto func ( const std::tuple < first_only_tuple < T , tmp::integral < int , N > > , rule_list ... > & rules , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack , std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > & table , int n ) -> int
+			static auto func ( const std::tuple < first_only_tuple < T , ftmp::integral < int , N > > , rule_list ... > & rules , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack , std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > & table , int n ) -> int
 			{
 				if ( n == N )
 				{
 					auto push_value = apply < id_type > ( std::get < 0 > ( std::get < 0 > ( rules ) ).value , stack ) ;
 					auto state = std::get < 0 > ( stack.top ( ) ) ;
-					using rule_id = typename get_id_type < typename tmp::head < typename T::type >::type >::type ;
+					using rule_id = typename get_id_type < typename ftmp::head < typename T::type >::type >::type ;
 					auto goto_ = table [ state ] [ static_cast < int > ( rule_id::value ) ] ;
 					if ( ! goto_ )
 					{
@@ -1265,7 +1249,7 @@ namespace parser_combinator
 		}
 		template < typename ... rules_type >
 		template < typename id_type_ , id_type_ id >
-		auto parser < rules_type ... >::operator ( ) ( const typename tmp::lookup < tmp::integral < id_type_ , id > , type_id_map >::type & value , tmp::integral < id_type_ , id > id_ ) -> parser &
+		auto parser < rules_type ... >::operator ( ) ( const typename ftmp::lookup < ftmp::integral < id_type_ , id > , type_id_map >::type & value , ftmp::integral < id_type_ , id > id_ ) -> parser &
 		{
 			auto & elm = table_ [ state_ ] [ static_cast < int > ( id ) ] ;
 			if ( ! elm )
@@ -1287,7 +1271,7 @@ namespace parser_combinator
 		template < typename ... rules_type >
 		auto parser < rules_type ... >::end ( ) -> parser &
 		{
-			return ( * this ) ( nullptr , tmp::integral < id_type , id_type::parser_combinator_parser_decl_rule_ids_end > { } ) ;
+			return ( * this ) ( nullptr , ftmp::integral < id_type , id_type::parser_combinator_parser_decl_rule_ids_end > { } ) ;
 		}
 		template < typename ... rules_type >
 		auto make_parser ( const rules_type & ... rules ) -> parser < rules_type ... >

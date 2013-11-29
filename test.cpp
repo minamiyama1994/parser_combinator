@@ -1,3 +1,19 @@
+/*  Parser combinator Library
+ *  Copyright (C) 2013  Masakazu Minamiyama
+ *  
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *  
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *  
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include"parser_combinator/parser.hpp"
 namespace pp = parser_combinator::parser ;
 
@@ -117,27 +133,27 @@ try
 				// 
 				// TODO:
 				// Implementation, such as macros for Optional.
-				psr ( nullptr , tmp::integral < id , id::plus_operation_id > { } ) ;
+				psr ( nullptr , ftmp::integral < id , id::plus_operation_id > { } ) ;
 			}
 			else if ( * iter == '-' )
 			{
-				psr ( nullptr , tmp::integral < id , id::minus_operation_id > { } ) ;
+				psr ( nullptr , ftmp::integral < id , id::minus_operation_id > { } ) ;
 			}
 			else if ( * iter == '*' )
 			{
-				psr ( nullptr , tmp::integral < id , id::mul_operation_id > { } ) ;
+				psr ( nullptr , ftmp::integral < id , id::mul_operation_id > { } ) ;
 			}
 			else if ( * iter == '/' )
 			{
-				psr ( nullptr , tmp::integral < id , id::div_operation_id > { } ) ;
+				psr ( nullptr , ftmp::integral < id , id::div_operation_id > { } ) ;
 			}
 			else if ( * iter == '(' )
 			{
-				psr ( nullptr , tmp::integral < id , id::lp_id > { } ) ;
+				psr ( nullptr , ftmp::integral < id , id::lp_id > { } ) ;
 			}
 			else if ( * iter == ')' )
 			{
-				psr ( nullptr , tmp::integral < id , id::rp_id > { } ) ;
+				psr ( nullptr , ftmp::integral < id , id::rp_id > { } ) ;
 			}
 			else if ( std::string { "0123456789." }.find ( * iter ) != std::string::npos )
 			{
@@ -150,10 +166,10 @@ try
 				std::istringstream num_stream { tmp_str } ;
 				double x ;
 				num_stream >> x ;
-				psr ( x , tmp::integral < id , id::number_id > { } ) ;
+				psr ( x , ftmp::integral < id , id::number_id > { } ) ;
 			}
 		}
-		psr ( nullptr , tmp::integral < id , id::ln_id > { } ) ;
+		psr ( nullptr , ftmp::integral < id , id::ln_id > { } ) ;
 	}
 	
 	// I want to specify that this is the end of the input.
