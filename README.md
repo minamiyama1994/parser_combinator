@@ -11,7 +11,7 @@ Therefore, we decided to also serve the purpose of learning about LR parsing alg
 ## Notice
 
 * I was prepared as described in page 119 from page 110 of [ISBN978-4-7819-1315-5](http://www.saiensu.co.jp/?page=book_details&ISBN=ISBN978-4-7819-1315-5).
-* The library is made ​​using the [TMP](https://github.com/minamiyama1994/TMP) Library.
+* The library is made ​​using the [FTMP](https://github.com/minamiyama1994/FTMP) Library.
 
 ## Sample
 
