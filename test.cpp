@@ -58,8 +58,7 @@ try
 	// 
 	// TODO:
 	// I want to change the design to use to force the addition of semantic action in the future.
-	auto psr = pp::make_parser
-	(
+	MAKE_PARSER_BEGIN ( psr , SHIFT_REDUCE_CONFLICT_CONCEPT_ERROR , REDUCE_REDUCE_CONFLICT_CONCEPT_ERROR )
 		( exprs = ln ) ( [ ] ( void * ) -> void *
 		{
 			std::cout << "> " ;
@@ -114,7 +113,7 @@ try
 		{
 			return arg ;
 		} )
-	) ;
+	MAKE_PARSER_END
 	
 	// I do it manually now lexical analysis part because it is not implemented yet.
 	// 
@@ -167,6 +166,13 @@ try
 				double x ;
 				num_stream >> x ;
 				psr ( x , ftmp::integral < id , id::number_id > { } ) ;
+			}
+			else if ( std::string { " \t\r\n" }.find ( * iter ) != std::string::npos )
+			{
+			}
+			else
+			{
+				throw std::runtime_error { "parse error." } ;
 			}
 		}
 		psr ( nullptr , ftmp::integral < id , id::ln_id > { } ) ;

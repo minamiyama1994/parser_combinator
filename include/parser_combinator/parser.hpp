@@ -58,11 +58,24 @@
 		parser_combinator_parser_decl_rule_ids_end \
 	} ;
 #define DECL_TOP_RULE(T,id,name) \
-	parser_combinator::parser::top_rule < T , decltype ( id ) , id > name { }
+	::parser_combinator::parser::top_rule < T , decltype ( id ) , id > name { }
 #define DECL_RULE(T,id,name) \
-	parser_combinator::parser::rule < T , decltype ( id ) , id > name { }
+	::parser_combinator::parser::rule < T , decltype ( id ) , id > name { }
 #define DECL_TERMINAL(T,id,name) \
-	parser_combinator::parser::terminal < T , decltype ( id ) , id > name { }
+	::parser_combinator::parser::terminal < T , decltype ( id ) , id > name { }
+#define MAKE_PARSER_BEGIN(name,shift_reduce_concept,reduce_reduce_concept) \
+	auto name = ::parser_combinator::parser::make_parser < shift_reduce_concept , reduce_reduce_concept > \
+	(
+#define MAKE_PARSER_END \
+	) ;
+#define SHIFT_REDUCE_CONFLICT_CONCEPT_SHIFT ::parser_combinator::parser::shift_reduce_conflict_concept::shift
+#define SHIFT_REDUCE_CONFLICT_CONCEPT_REDUCE ::parser_combinator::parser::shift_reduce_conflict_concept::reduce
+#define SHIFT_REDUCE_CONFLICT_CONCEPT_BOTH ::parser_combinator::parser::shift_reduce_conflict_concept::both
+#define SHIFT_REDUCE_CONFLICT_CONCEPT_ERROR ::parser_combinator::parser::shift_reduce_conflict_concept::error
+#define REDUCE_REDUCE_CONFLICT_CONCEPT_BEFORE ::parser_combinator::parser::reduce_reduce_conflict_concept::before
+#define REDUCE_REDUCE_CONFLICT_CONCEPT_AFTER ::parser_combinator::parser::reduce_reduce_conflict_concept::after
+#define REDUCE_REDUCE_CONFLICT_CONCEPT_BOTH ::parser_combinator::parser::reduce_reduce_conflict_concept::both
+#define REDUCE_REDUCE_CONFLICT_CONCEPT_ERROR ::parser_combinator::parser::reduce_reduce_conflict_concept::error
 namespace parser_combinator
 {
 	namespace parser
@@ -75,6 +88,20 @@ namespace parser_combinator
 				using type = void ;
 			} ;
 		}
+		enum class shift_reduce_conflict_concept
+		{
+			shift ,
+			reduce ,
+			both ,
+			error
+		} ;
+		enum class reduce_reduce_conflict_concept
+		{
+			before ,
+			after ,
+			both ,
+			error
+		} ;
 		template < typename lhs_type , typename rhs_type >
 		struct assign_result ;
 		template < typename lhs_type , typename rhs_type >
@@ -771,7 +798,7 @@ namespace parser_combinator
 		public :
 			using std::runtime_error::runtime_error ;
 		} ;
-		template < typename id_type >
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename id_type >
 		auto make_shift_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < std::shared_ptr < term < id_type > > > & components , const std::vector < element_type < id_type > > & env ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
 		{
 			std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > res ;
@@ -785,18 +812,10 @@ namespace parser_combinator
 			}
 			return res ;
 		}
-		template < typename id_type >
-		auto make_reduce_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < std::shared_ptr < term < id_type > > > & components , const std::vector < element_type < id_type > > & env ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename id_type >
+		auto make_reduce_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < element_type < id_type > > & env ) -> std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > >
 		{
-			std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > res ;
-			for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
-			{
-				for ( auto component_iter = components.begin ( ) ; component_iter != components.end ( ) ; ++ component_iter )
-				{
-					auto goto_ = make_goto ( * closure_iter , * component_iter , env ) ;
-					res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] = nullptr ;
-				}
-			}
+			std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > res ;
 			auto tmp_env = env ;
 			for ( auto & elem : tmp_env )
 			{
@@ -809,36 +828,57 @@ namespace parser_combinator
 			{
 				for ( auto rule_iter = closure_iter->begin ( ) ; rule_iter != closure_iter->end ( ) ; ++ rule_iter )
 				{
-					if ( rule_iter->first.second.back ( )->is_current_read ( ) )
+					if ( ! rule_iter->first.second.back ( )->is_current_read ( ) )
 					{
-						for ( auto & elem : make_follow ( { rule_iter->first.first } , tmp_env ) )
+						continue ;
+					}
+					for ( auto & elem : make_follow ( { rule_iter->first.first } , tmp_env ) )
+					{
+						auto & elm = res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( elem->get ( ) ) ] ;
+						if ( elm.empty ( ) )
 						{
-							auto & elm = res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( elem->get ( ) ) ] ;
-							if ( elm )
-							{
-								std::ostringstream stream ;
-								stream << "reduce/reduce conflict." << std::endl << "    rule:" << elm->get ( ) << std::endl << "    rule:" << rule_iter->second << std::endl ;
-								throw conflict_error { stream.str ( ) } ;
-							}
-							elm = std::make_shared < detail_reduce > ( rule_iter->second ) ;
+							elm.push_back ( std::make_shared < detail_reduce > ( rule_iter->second ) ) ;
+							continue ;
+						}
+						switch ( reduce_reduce_concept )
+						{
+							case reduce_reduce_conflict_concept::before :
+								{
+									elm = std::vector < std::shared_ptr < detail_action_base > > { std::make_shared < detail_reduce > ( std::min ( elm [ 0 ]->get ( ) , rule_iter->second ) ) } ;
+								}
+								break ;
+							case reduce_reduce_conflict_concept::after :
+								{
+									elm = std::vector < std::shared_ptr < detail_action_base > > { std::make_shared < detail_reduce > ( std::max ( elm [ 0 ]->get ( ) , rule_iter->second ) ) } ;
+								}
+								break ;
+							case reduce_reduce_conflict_concept::both :
+								{
+									elm.push_back ( std::make_shared < detail_reduce > ( rule_iter->second ) ) ;
+								}
+								break ;
+							case reduce_reduce_conflict_concept::error :
+								{
+									std::ostringstream stream ;
+									stream << "reduce/reduce conflict." << std::endl ;
+									for ( auto & e : elm )
+									{
+										stream << "    rule:" << e->get ( ) << std::endl ;
+									}
+									stream << "    rule:" << rule_iter->second << std::endl ;
+									throw conflict_error { stream.str ( ) } ;
+								}
+								break ;
 						}
 					}
 				}
 			}
 			return res ;
 		}
-		template < typename id_type >
-		auto make_accept_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < std::shared_ptr < term < id_type > > > & components , const std::vector < element_type < id_type > > & env ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename id_type >
+		auto make_accept_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < std::shared_ptr < term < id_type > > > & components ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
 		{
 			std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > res ;
-			for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
-			{
-				for ( auto component_iter = components.begin ( ) ; component_iter != components.end ( ) ; ++ component_iter )
-				{
-					auto goto_ = make_goto ( * closure_iter , * component_iter , env ) ;
-					res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] = nullptr ;
-				}
-			}
 			for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
 			{
 				for ( auto rule_iter = closure_iter->begin ( ) ; rule_iter != closure_iter->end ( ) ; ++ rule_iter )
@@ -851,13 +891,13 @@ namespace parser_combinator
 			}
 			return res ;
 		}
-		template < typename id_type >
-		auto make_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < std::shared_ptr < term < id_type > > > & components , const std::vector < element_type < id_type > > & env ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename id_type >
+		auto make_table ( const std::vector < std::set < element_type < id_type > > > & closures , const std::vector < std::shared_ptr < term < id_type > > > & components , const std::vector < element_type < id_type > > & env ) -> std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > >
 		{
-			auto shift_table = make_shift_table ( closures , components , env ) ;
-			auto reduce_table = make_reduce_table ( closures , components , env ) ;
-			auto accept_table = make_accept_table ( closures , components , env ) ;
-			std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > res ;
+			auto shift_table = make_shift_table < shift_reduce_concept , reduce_reduce_concept > ( closures , components , env ) ;
+			auto reduce_table = make_reduce_table < shift_reduce_concept , reduce_reduce_concept > ( closures , env ) ;
+			auto accept_table = make_accept_table < shift_reduce_concept , reduce_reduce_concept > ( closures , components ) ;
+			std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > res ;
 			for ( auto closure_iter = closures.begin ( ) ; closure_iter != closures.end ( ) ; ++ closure_iter )
 			{
 				for ( auto component_iter = components.begin ( ) ; component_iter != components.end ( ) ; ++ component_iter )
@@ -865,23 +905,73 @@ namespace parser_combinator
 					auto shift_ = shift_table [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] ;
 					auto reduce_ = reduce_table [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] ;
 					auto accept_ = accept_table [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] ;
-					if ( shift_ && ( reduce_ || accept_ ) )
+					auto & r = res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] ;
+					if ( shift_ && ( ( ! reduce_.empty ( ) ) || accept_ ) )
 					{
-						std::ostringstream stream ;
-						stream << "shift/reduce conflict." << std::endl ;
-						std::set < int > rule_nums ;
-						for ( auto & elem : * closure_iter )
+						switch ( shift_reduce_concept )
 						{
-							rule_nums.insert ( elem.second ) ;
+							case shift_reduce_conflict_concept::shift :
+								{
+									r.push_back ( shift_ ) ;
+								}
+								break ;
+							case shift_reduce_conflict_concept::reduce :
+								{
+									r.insert ( r.end ( ) , reduce_.begin ( ) , reduce_.end ( ) ) ;
+									if ( accept_ )
+									{
+										r.push_back ( accept_ ) ;
+									}
+								}
+								break ;
+							case shift_reduce_conflict_concept::both :
+								{
+									r.push_back ( shift_ ) ;
+									r.insert ( r.end ( ) , reduce_.begin ( ) , reduce_.end ( ) ) ;
+									if ( accept_ )
+									{
+										r.push_back ( accept_ ) ;
+									}
+								}
+								break ;
+							case shift_reduce_conflict_concept::error :
+								{
+									std::ostringstream stream ;
+									stream << "shift/reduce conflict." << std::endl ;
+									std::set < int > rule_nums ;
+									for ( auto & elem : * closure_iter )
+									{
+										rule_nums.insert ( elem.second ) ;
+									}
+									for ( auto & r : reduce_ )
+									{
+										rule_nums.insert ( r->get ( ) ) ;
+									}
+									if ( accept_ )
+									{
+										rule_nums.insert ( accept_->get ( ) ) ;
+									}
+									for ( auto & elem : rule_nums )
+									{
+										stream << "    rule:" << elem << std::endl ;
+									}
+									throw conflict_error { stream.str ( ) } ;
+								}
+								break ;
 						}
-						rule_nums.insert ( reduce_ ? reduce_->get ( ) : accept_->get ( ) ) ;
-						for ( auto & elem : rule_nums )
-						{
-							stream << "    rule:" << elem << std::endl ;
-						}
-						throw conflict_error { stream.str ( ) } ;
 					}
-					res [ closure_iter - closures.begin ( ) ] [ static_cast < int > ( ( * component_iter )->get ( ) ) ] = shift_ ? shift_ : reduce_ ? reduce_ : accept_ ;
+					else if ( shift_ )
+					{
+						r.push_back ( shift_ ) ;
+					}
+					else if ( ( ! reduce_.empty ( ) ) || accept_ )
+					{
+						r.insert ( r.end ( ) , reduce_.begin ( ) , reduce_.end ( ) ) ;
+						if ( accept_ )
+						{
+							r.push_back ( accept_ ) ;
+						}
+					}
 				}
 			}
 			return res ;
@@ -900,9 +990,12 @@ namespace parser_combinator
 			: ftmp::id < T >
 		{
 		} ;
-		template < typename ... rules_type >
-		class parser
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
+		class parser ;
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
+		class parser_impl
 		{
+			friend class parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... > ;
 			using rules_type_ = typename make_rules
 			<
 				1 ,
@@ -925,9 +1018,23 @@ namespace parser_combinator
 					>::type
 				>::type
 			>::type ;
+			std::stack < std::tuple < int , typename std::shared_ptr < term < id_type > > , boost::any > > stack_ = std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , typename boost::any > > { { std::make_tuple ( 0 , nullptr , boost::any { } ) } } ;
+			int state_ { 0 } ;
+		public :
+			parser_impl ( ) = default ;
+			parser_impl ( const parser_impl & ) = default ;
+			parser_impl ( parser_impl && ) = default ;
+			auto operator = ( const parser_impl & ) -> parser_impl & = default ;
+			auto operator = ( parser_impl && ) -> parser_impl & = default ;
+			~ parser_impl ( ) = default ;
+		} ;
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
+		struct parser
+		{
+			using impl_type = parser_impl < shift_reduce_concept , reduce_reduce_concept , rules_type ... > ;
 			using type_id_map = typename ftmp::insert
 			<
-				typename get_id_type < end_read < void * , id_type > >::type ,
+				typename get_id_type < end_read < void * , typename impl_type::id_type > >::type ,
 				void * ,
 				typename ftmp::to_dict
 				<
@@ -962,7 +1069,7 @@ namespace parser_combinator
 									ftmp::head < ftmp::arg < 0 > > ,
 									typename to_list
 									<
-										typename to_rule_list < rules_type_ >::type
+										typename to_rule_list < typename impl_type::rules_type_ >::type
 									>::type
 								>::type
 							>::type
@@ -970,11 +1077,11 @@ namespace parser_combinator
 					>::type
 				>::type
 			>::type ;
-			std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > table_ = [ ] ( ) -> std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > >
+			std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > table_ = [ ] ( ) -> std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > >
 			{
 				const auto LR0s = make_LR0
 				<
-					typename to_rule_list < rules_type_ >::type
+					typename to_rule_list < typename impl_type::rules_type_ >::type
 				> ( ) ;
 				using id_type_ = typename decltype ( LR0s )::value_type::first_type::first_type::element_type::type ;
 				std::set < std::shared_ptr < term < id_type_ > > > pre_components ;
@@ -995,21 +1102,20 @@ namespace parser_combinator
 				std::vector < std::shared_ptr < term < id_type_ > > > components ( pre_components.begin ( ) , pre_components.end ( ) ) ;
 				components.push_back ( get_detail_terminal < id_type_ , id_type_::parser_combinator_parser_decl_rule_ids_end > ( ) ) ;
 				auto closures = make_closures ( LR0s ) ;
-				return make_table ( closures , components , LR0s ) ;
+				return make_table < shift_reduce_concept , reduce_reduce_concept > ( closures , components , LR0s ) ;
 			} ( ) ;
-			rules_type_ rules_ ;
-			std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > stack_ { { std::make_tuple ( 0 , nullptr , boost::any { } ) } } ;
-			int state_ { 0 } ;
+			typename impl_type::rules_type_ rules_ ;
+			std::vector < impl_type > parser_table_ ;
 		public :
 			parser ( ) = delete ;
-			parser ( const parser & ) = delete ;
+			parser ( const parser & ) = default ;
 			parser ( parser && ) = default ;
-			auto operator = ( const parser & ) -> parser & = delete ;
+			auto operator = ( const parser & ) -> parser & = default ;
 			auto operator = ( parser && ) -> parser & = default ;
 			~ parser ( ) = default ;
 			parser ( const rules_type & ... rules ) ;
-			template < typename id_type_ , id_type_ id >
-			auto operator ( ) ( const typename ftmp::lookup < ftmp::integral < id_type_ , id > , type_id_map >::type & value , ftmp::integral < id_type_ , id > id_ ) -> parser & ;
+			template < typename impl_type::id_type id >
+			auto operator ( ) ( const typename ftmp::lookup < ftmp::integral < typename impl_type::id_type , id > , type_id_map >::type & value , ftmp::integral < typename impl_type::id_type , id > id_ ) -> parser & ;
 			auto end ( ) -> parser & ;
 		} ;
 		template < typename head_type , typename ... tail_type >
@@ -1207,7 +1313,7 @@ namespace parser_combinator
 		template < typename id_type , typename T , int N , typename ... rule_list >
 		struct do_reduce_impl < id_type , std::tuple < first_only_tuple < T , ftmp::integral < int , N > > , rule_list ... > >
 		{
-			static auto func ( const std::tuple < first_only_tuple < T , ftmp::integral < int , N > > , rule_list ... > & rules , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack , std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > & table , int n ) -> int
+			static auto func ( std::vector < std::pair < int , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > > > & states , const std::tuple < first_only_tuple < T , ftmp::integral < int , N > > , rule_list ... > & rules , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack , std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > & table , int n ) -> void
 			{
 				if ( n == N )
 				{
@@ -1215,68 +1321,99 @@ namespace parser_combinator
 					auto state = std::get < 0 > ( stack.top ( ) ) ;
 					using rule_id = typename get_id_type < typename ftmp::head < typename T::type >::type >::type ;
 					auto goto_ = table [ state ] [ static_cast < int > ( rule_id::value ) ] ;
-					if ( ! goto_ )
+					if ( goto_.empty ( ) )
 					{
 						throw parse_error { "parse error" } ;
 					}
-					stack.push ( std::make_tuple ( goto_->get ( ) , make_LR0_heper < top_rule < void * , id_type , rule_id::value > >::func ( ) , push_value ) ) ;
-					state = goto_->get ( ) ;
-					return state ;
+					for ( auto & g : goto_ )
+					{
+						std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > s = stack ;
+						s.push ( std::make_tuple ( g->get ( ) , make_LR0_heper < top_rule < void * , id_type , rule_id::value > >::func ( ) , push_value ) ) ;
+						states.push_back ( std::make_pair ( g->get ( ) , std::move ( s ) ) ) ;
+					}
 				}
 				else
 				{
-					return do_reduce_impl < id_type , std::tuple < rule_list ... > >::func ( tuple_tail ( rules ) , stack , table , n ) ;
+					do_reduce_impl < id_type , std::tuple < rule_list ... > >::func ( states , tuple_tail ( rules ) , stack , table , n ) ;
 				}
 			}
 		} ;
 		template < typename id_type >
 		struct do_reduce_impl < id_type , std::tuple < > >
 		{
-			static auto func ( const std::tuple < > & , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & , std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > & , int ) -> int
+			static auto func ( std::vector < std::pair < int , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > > > & , const std::tuple < > & , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & , std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > & , int ) -> void
 			{
 				throw parse_error { "parse error" } ;
 			}
 		} ;
 		template < typename id_type , typename ... T >
-		auto do_reduce ( const std::tuple < T ... > & rules , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack , std::unordered_map < int , std::unordered_map < int , std::shared_ptr < detail_action_base > > > & table , int n ) -> int
+		auto do_reduce ( std::vector < std::pair < int , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > > > & states , const std::tuple < T ... > & rules , std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > & stack , std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > & table , int n ) -> void
 		{
-			return do_reduce_impl < id_type , std::tuple < T ... > >::func ( rules , stack , table , n ) ;
+			do_reduce_impl < id_type , std::tuple < T ... > >::func ( states , rules , stack , table , n ) ;
 		}
-		template < typename ... rules_type >
-		parser < rules_type ... >::parser ( const rules_type & ... rules )
-			: rules_ { dummy_type { } , rules ... }
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
+		parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... >::parser ( const rules_type & ... rules )
+			: rules_ { dummy_type { } , std::move ( rules ) ... }
+			, parser_table_ ( 1 )
 		{
 		}
-		template < typename ... rules_type >
-		template < typename id_type_ , id_type_ id >
-		auto parser < rules_type ... >::operator ( ) ( const typename ftmp::lookup < ftmp::integral < id_type_ , id > , type_id_map >::type & value , ftmp::integral < id_type_ , id > id_ ) -> parser &
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
+		template < typename parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... >::impl_type::id_type id >
+		auto parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... >::operator ( ) ( const typename ftmp::lookup < ftmp::integral < typename impl_type::id_type , id > , type_id_map >::type & value , ftmp::integral < typename impl_type::id_type , id > id_ ) -> parser &
 		{
-			auto & elm = table_ [ state_ ] [ static_cast < int > ( id ) ] ;
-			if ( ! elm )
+			if ( parser_table_.empty ( ) )
 			{
 				throw parse_error { "parse error" } ;
 			}
-			else if ( elm->is_shift ( ) )
+			std::vector < impl_type > next ;
+			for ( auto & psr : parser_table_ )
 			{
-				stack_.push ( std::make_tuple ( elm->get ( ) , make_LR0_heper < top_rule < void * , id_type , id > >::func ( ) , value ) ) ;
-				state_ = elm->get ( ) ;
+				for ( auto & elm : table_ [ psr.state_ ] [ static_cast < int > ( id ) ] )
+				{
+					if ( elm )
+					{
+						auto p = psr ;
+						if ( elm->is_shift ( ) )
+						{
+							p.stack_.push ( std::make_tuple ( elm->get ( ) , make_LR0_heper < top_rule < void * , typename impl_type::id_type , id > >::func ( ) , value ) ) ;
+							p.state_ = elm->get ( ) ;
+							next.push_back ( p ) ;
+						}
+						else if ( elm->is_reduce ( ) )
+						{
+							std::vector < std::pair < int , std::stack < std::tuple < int , std::shared_ptr < term < typename impl_type::id_type > > , boost::any > > > > states ;
+							do_reduce ( states , rules_ , p.stack_ , table_ , elm->get ( ) ) ;
+							parser parsers { * this } ;
+							parsers.parser_table_.clear ( ) ;
+							for ( auto & state : states )
+							{
+								impl_type p_ { p } ;
+								p_.state_ = state.first ;
+								p_.stack_ = state.second ;
+								parsers.parser_table_.push_back ( std::move ( p_ ) ) ;
+							}
+							parsers ( value , id_ ) ;
+							std::move ( parsers.parser_table_.begin ( ) , parsers.parser_table_.end ( ) , std::back_inserter ( next ) ) ;
+						}
+						else
+						{
+							next.push_back ( p ) ;
+						}
+					}
+				}
 			}
-			else if ( elm->is_reduce ( ) )
-			{
-				state_ = do_reduce < id_type > ( rules_ , stack_ ,table_ , elm->get ( ) ) ;
-				return ( * this ) ( value , id_ ) ;
-			}
+			parser_table_.swap ( next ) ;
 			return * this ;
 		}
-		template < typename ... rules_type >
-		auto parser < rules_type ... >::end ( ) -> parser &
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
+		auto parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... >::end ( ) -> parser &
 		{
-			return ( * this ) ( nullptr , ftmp::integral < id_type , id_type::parser_combinator_parser_decl_rule_ids_end > { } ) ;
+			return ( * this ) ( nullptr , ftmp::integral < typename impl_type::id_type , impl_type::id_type::parser_combinator_parser_decl_rule_ids_end > { } ) ;
 		}
-		template < typename ... rules_type >
-		auto make_parser ( const rules_type & ... rules ) -> parser < rules_type ... >
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
+		auto make_parser ( const rules_type & ... rules ) -> parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... >
 		{
-			return parser < rules_type ... > { rules ... } ;
+			return parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... > { rules ... } ;
 		}
 	}
 }
