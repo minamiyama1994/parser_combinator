@@ -17,6 +17,13 @@ Therefore, we decided to also serve the purpose of learning about LR parsing alg
 
 See [test.cpp](https://github.com/minamiyama1994/parser_combinator/blob/master/test.cpp)
 
+## Compiler
+
+I'm sure the compiler of the following
+
+* GCC4.8.10
+* Clang3.4
+
 ## License
 
                     GNU GENERAL PUBLIC LICENSE

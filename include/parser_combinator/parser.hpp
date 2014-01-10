@@ -1029,7 +1029,7 @@ namespace parser_combinator
 			~ parser_impl ( ) = default ;
 		} ;
 		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
-		struct parser
+		class parser
 		{
 			using impl_type = parser_impl < shift_reduce_concept , reduce_reduce_concept , rules_type ... > ;
 			using type_id_map = typename ftmp::insert
@@ -1114,8 +1114,8 @@ namespace parser_combinator
 			auto operator = ( parser && ) -> parser & = default ;
 			~ parser ( ) = default ;
 			parser ( const rules_type & ... rules ) ;
-			template < typename impl_type::id_type id >
-			auto operator ( ) ( const typename ftmp::lookup < ftmp::integral < typename impl_type::id_type , id > , type_id_map >::type & value , ftmp::integral < typename impl_type::id_type , id > id_ ) -> parser & ;
+			template < typename id >
+			auto operator ( ) ( const typename ftmp::lookup < id , type_id_map >::type & value , id id_ ) -> parser & ;
 			auto end ( ) -> parser & ;
 		} ;
 		template < typename head_type , typename ... tail_type >
@@ -1358,8 +1358,8 @@ namespace parser_combinator
 		{
 		}
 		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
-		template < typename parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... >::impl_type::id_type id >
-		auto parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... >::operator ( ) ( const typename ftmp::lookup < ftmp::integral < typename impl_type::id_type , id > , type_id_map >::type & value , ftmp::integral < typename impl_type::id_type , id > id_ ) -> parser &
+		template < typename id >
+		auto parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... >::operator ( ) ( const typename ftmp::lookup < id , type_id_map >::type & value , id id_ ) -> parser &
 		{
 			if ( parser_table_.empty ( ) )
 			{
@@ -1368,14 +1368,14 @@ namespace parser_combinator
 			std::vector < impl_type > next ;
 			for ( auto & psr : parser_table_ )
 			{
-				for ( auto & elm : table_ [ psr.state_ ] [ static_cast < int > ( id ) ] )
+				for ( auto & elm : table_ [ psr.state_ ] [ static_cast < int > ( id::value ) ] )
 				{
 					if ( elm )
 					{
 						auto p = psr ;
 						if ( elm->is_shift ( ) )
 						{
-							p.stack_.push ( std::make_tuple ( elm->get ( ) , make_LR0_heper < top_rule < void * , typename impl_type::id_type , id > >::func ( ) , value ) ) ;
+							p.stack_.push ( std::make_tuple ( elm->get ( ) , make_LR0_heper < top_rule < void * , typename impl_type::id_type , id::value > >::func ( ) , value ) ) ;
 							p.state_ = elm->get ( ) ;
 							next.push_back ( p ) ;
 						}

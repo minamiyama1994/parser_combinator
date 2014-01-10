@@ -1,3 +1,4 @@
+#! /bin/sh
 #   Parser combinator Library
 #   Copyright (C) 2013  Masakazu Minamiyama
 #   
@@ -13,6 +14,5 @@
 #   
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#! /bin/sh
 cp -v .listup Makefile test.cpp README.md /C/GitHub/parser_combinator/
 cp -v include/parser_combinator/{parser,lexer}.hpp /C/GitHub/parser_combinator/include/parser_combinator/
