@@ -31,10 +31,10 @@
 #include"boost/any.hpp"
 #include"FTMP/append.hpp"
 #include"FTMP/at.hpp"
+#include"FTMP/concat.hpp"
 #include"FTMP/cons.hpp"
 #include"FTMP/eval.hpp"
 #include"FTMP/filter.hpp"
-#include"FTMP/foldr.hpp"
 #include"FTMP/head.hpp"
 #include"FTMP/id.hpp"
 #include"FTMP/insert.hpp"
@@ -46,7 +46,6 @@
 #include"FTMP/to_dict.hpp"
 #include"FTMP/to_list.hpp"
 #include"FTMP/to_set.hpp"
-#include"FTMP/unique.hpp"
 #define DECL_RULE_IDS_BEGIN(name) \
 	enum class name : int \
 	{ \
@@ -1038,25 +1037,15 @@ namespace parser_combinator
 				void * ,
 				typename ftmp::to_dict
 				<
-					typename ftmp::foldr
+					typename ftmp::map
 					<
-						ftmp::eval < ftmp::cons
+						ftmp::eval < ftmp::list
 						<
-							ftmp::eval < ftmp::list
-							<
-								get_id_type < ftmp::arg < 0 > > ,
-								get_type < ftmp::arg < 0 > >
-							> > ,
-							ftmp::id < ftmp::arg < 1 > >
+							get_id_type < ftmp::arg < 0 > > ,
+							get_type < ftmp::arg < 0 > >
 						> > ,
-						ftmp::list < > ,
-						typename ftmp::foldr
+						typename ftmp::concat
 						<
-							ftmp::eval < ftmp::unique
-							<
-								ftmp::append < ftmp::arg < 0 > , ftmp::arg < 1 > >
-							> > ,
-							ftmp::list < > ,
 							typename ftmp::map
 							<
 								ftmp::eval < ftmp::cons
@@ -1077,33 +1066,39 @@ namespace parser_combinator
 					>::type
 				>::type
 			>::type ;
-			std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > table_ = [ ] ( ) -> std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > >
+			static auto get_table ( ) -> std::shared_ptr < std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > >
 			{
-				const auto LR0s = make_LR0
-				<
-					typename to_rule_list < typename impl_type::rules_type_ >::type
-				> ( ) ;
-				using id_type_ = typename decltype ( LR0s )::value_type::first_type::first_type::element_type::type ;
-				std::set < std::shared_ptr < term < id_type_ > > > pre_components ;
-				for ( auto & elem : LR0s )
+				static std::shared_ptr < std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > > res ;
+				if ( ! res )
 				{
-					if ( ! elem.first.first->is_current_read ( ) )
+					const auto LR0s = make_LR0
+					<
+						typename to_rule_list < typename impl_type::rules_type_ >::type
+					> ( ) ;
+					using id_type_ = typename decltype ( LR0s )::value_type::first_type::first_type::element_type::type ;
+					std::set < std::shared_ptr < term < id_type_ > > > pre_components ;
+					for ( auto & elem : LR0s )
 					{
-						pre_components.insert ( elem.first.first ) ;
-					}
-					for ( auto & elm : elem.first.second )
-					{
-						if ( ! elm->is_current_read ( ) )
+						if ( ! elem.first.first->is_current_read ( ) )
 						{
-							pre_components.insert ( elm ) ;
+							pre_components.insert ( elem.first.first ) ;
+						}
+						for ( auto & elm : elem.first.second )
+						{
+							if ( ! elm->is_current_read ( ) )
+							{
+								pre_components.insert ( elm ) ;
+							}
 						}
 					}
+					std::vector < std::shared_ptr < term < id_type_ > > > components ( pre_components.begin ( ) , pre_components.end ( ) ) ;
+					components.push_back ( get_detail_terminal < id_type_ , id_type_::parser_combinator_parser_decl_rule_ids_end > ( ) ) ;
+					auto closures = make_closures ( LR0s ) ;
+					res = std::make_shared < std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > > ( make_table < shift_reduce_concept , reduce_reduce_concept > ( closures , components , LR0s ) ) ;
 				}
-				std::vector < std::shared_ptr < term < id_type_ > > > components ( pre_components.begin ( ) , pre_components.end ( ) ) ;
-				components.push_back ( get_detail_terminal < id_type_ , id_type_::parser_combinator_parser_decl_rule_ids_end > ( ) ) ;
-				auto closures = make_closures ( LR0s ) ;
-				return make_table < shift_reduce_concept , reduce_reduce_concept > ( closures , components , LR0s ) ;
-			} ( ) ;
+				return res ;
+			} ;
+			std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > & table_ = * get_table ( ) ;
 			typename impl_type::rules_type_ rules_ ;
 			std::vector < impl_type > parser_table_ ;
 		public :

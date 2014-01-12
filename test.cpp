@@ -21,6 +21,7 @@ namespace pp = parser_combinator::parser ;
 // By following this type as before.
 DECL_RULE_IDS_BEGIN ( id )
 	DECL_RULE_ID ( exprs_id )
+	DECL_RULE_ID ( decide_expr_id )
 	DECL_RULE_ID ( expr_id )
 	DECL_RULE_ID ( term_id )
 	DECL_RULE_ID ( fact_id )
@@ -39,6 +40,7 @@ try
 	// Declaration of the elements that make up the BNF.
 	// DECL_TOP_RULE is exactly one.
 	DECL_TOP_RULE ( void * , id::exprs_id , exprs ) ;
+	DECL_RULE ( double , id::decide_expr_id , decide_expr ) ;
 	DECL_RULE ( double , id::expr_id , expr ) ;
 	DECL_RULE ( double , id::term_id , term ) ;
 	DECL_RULE ( double , id::fact_id , fact ) ;
@@ -61,25 +63,21 @@ try
 	MAKE_PARSER_BEGIN ( psr , SHIFT_REDUCE_CONFLICT_CONCEPT_ERROR , REDUCE_REDUCE_CONFLICT_CONCEPT_ERROR )
 		( exprs = ln ) ( [ ] ( void * ) -> void *
 		{
-			std::cout << "> " ;
 			return nullptr ;
 		} ) ,
-		( exprs = expr >> ln ) ( [ ] ( double val , void * ) -> void *
+		( exprs = decide_expr >> ln ) ( [ ] ( double , void * ) -> void *
 		{
-			std::cout << val << std::endl ;
-			std::cout << "> " ;
 			return nullptr ;
 		} ) ,
-		( exprs = exprs >> ln ) ( [ ] ( void * , void * ) -> void *
+		( exprs = exprs >> decide_expr >> ln ) ( [ ] ( void * , double , void * ) -> void *
 		{
-			std::cout << "> " ;
 			return nullptr ;
 		} ) ,
-		( exprs = exprs >> expr >> ln ) ( [ ] ( void * , double val , void * ) -> void *
+		( decide_expr = expr ) ( [ ] ( double arg )
 		{
-			std::cout << val << std::endl ;
+			std::cout << arg << std::endl ;
 			std::cout << "> " ;
-			return nullptr ;
+			return arg ;
 		} ) ,
 		( expr = term ) ( [ ] ( double arg )
 		{
