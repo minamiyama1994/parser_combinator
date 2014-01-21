@@ -1017,7 +1017,7 @@ namespace parser_combinator
 					>::type
 				>::type
 			>::type ;
-			std::stack < std::tuple < int , typename std::shared_ptr < term < id_type > > , boost::any > > stack_ = std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , typename boost::any > > { { std::make_tuple ( 0 , nullptr , boost::any { } ) } } ;
+			std::stack < std::tuple < int , typename std::shared_ptr < term < id_type > > , boost::any > > stack_ = std::stack < std::tuple < int , typename std::shared_ptr < term < id_type > > , boost::any > > { { std::make_tuple ( 0 , nullptr , boost::any { } ) } } ;
 			int state_ { 0 } ;
 		public :
 			parser_impl ( ) = default ;
@@ -1098,7 +1098,7 @@ namespace parser_combinator
 				}
 				return res ;
 			} ;
-			std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > & table_ = * get_table ( ) ;
+			static std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > table_ ;
 			typename impl_type::rules_type_ rules_ ;
 			std::vector < impl_type > parser_table_ ;
 		public :
@@ -1113,6 +1113,8 @@ namespace parser_combinator
 			auto operator ( ) ( const typename ftmp::lookup < id , type_id_map >::type & value , id id_ ) -> parser & ;
 			auto end ( ) -> parser & ;
 		} ;
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
+		std::unordered_map < int , std::unordered_map < int , std::vector < std::shared_ptr < detail_action_base > > > > parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... >::table_ = * parser < shift_reduce_concept , reduce_reduce_concept , rules_type ... >::get_table ( ) ;
 		template < typename head_type , typename ... tail_type >
 		struct assign_to_function < ftmp::list < head_type , ftmp::list < tail_type ... > > >
 		{

@@ -37,6 +37,8 @@ DECL_RULE_IDS_END
 auto main ( ) -> int
 try
 {
+	std::cout.sync_with_stdio ( false ) ;
+	std::cin.sync_with_stdio ( false ) ;
 	// Declaration of the elements that make up the BNF.
 	// DECL_TOP_RULE is exactly one.
 	DECL_TOP_RULE ( void * , id::exprs_id , exprs ) ;
@@ -66,6 +68,10 @@ try
 			return nullptr ;
 		} ) ,
 		( exprs = decide_expr >> ln ) ( [ ] ( double , void * ) -> void *
+		{
+			return nullptr ;
+		} ) ,
+		( exprs = exprs >> ln ) ( [ ] ( void * , void * ) -> void *
 		{
 			return nullptr ;
 		} ) ,
