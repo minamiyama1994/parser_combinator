@@ -6,7 +6,7 @@ There is a boost::split the famous parser EDSL, but this is a LL parser, it is n
 
 In addition, it is too complicated To use easily.
 
-Therefore, we decided to also serve the purpose of learning about LR parsing algorithm, and make your own.
+Therefore, we decided to also serve the purpose of learning about SLR parsing algorithm(in addition, other), and make your own.
 
 ## Notice
 
