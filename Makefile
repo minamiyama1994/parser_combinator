@@ -19,7 +19,7 @@ listup_header:
 	find ../TMP/include/FTMP/*.hpp | sed -e s'|^\.\./FTMP/include/|#include"|' | sed -e s'/$$/"/'
 DEBUG_OPTIONS=-fprofile-arcs -ftest-coverage
 test_:
-	$(CXX) -pg $(DEBUG_OPTIONS) -I/local/include/boost-1_54/ -I./include/ -I../FTMP/include/ -DBOOST_RESULT_OF_USE_DECLTYPE -ftemplate-backtrace-limit=0 -Wall -Wextra -Werror --save-temps -std=c++11 test.cpp -o test
+	$(CXX) -pg $(DEBUG_OPTIONS) -I/local/include/boost-1_55/ -I./include/ -I../FTMP/include/ -DBOOST_RESULT_OF_USE_DECLTYPE -ftemplate-backtrace-limit=0 -Wall -Wextra -Werror --save-temps -std=c++11 test.cpp -o test
 run:
 	./test < script
 prof:run

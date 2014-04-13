@@ -1017,16 +1017,21 @@ namespace parser_combinator
 					>::type
 				>::type
 			>::type ;
-			std::stack < std::tuple < int , typename std::shared_ptr < term < id_type > > , boost::any > > stack_ = std::stack < std::tuple < int , typename std::shared_ptr < term < id_type > > , boost::any > > { { std::make_tuple ( 0 , nullptr , boost::any { } ) } } ;
+			std::stack < std::tuple < int , std::shared_ptr < term < id_type > > , boost::any > > stack_ ;
 			int state_ { 0 } ;
 		public :
-			parser_impl ( ) = default ;
+			parser_impl ( ) ;
 			parser_impl ( const parser_impl & ) = default ;
 			parser_impl ( parser_impl && ) = default ;
 			auto operator = ( const parser_impl & ) -> parser_impl & = default ;
 			auto operator = ( parser_impl && ) -> parser_impl & = default ;
 			~ parser_impl ( ) = default ;
 		} ;
+		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
+		parser_impl < shift_reduce_concept , reduce_reduce_concept , rules_type ... >::parser_impl ( )
+			: stack_ { { std::make_tuple ( 0 , nullptr , boost::any { } ) } }
+		{
+		}
 		template < shift_reduce_conflict_concept shift_reduce_concept , reduce_reduce_conflict_concept reduce_reduce_concept , typename ... rules_type >
 		class parser
 		{
