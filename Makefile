@@ -23,7 +23,7 @@ test_:
 run:
 	./test < script
 prof:run
-	gprof test.exe gmon.out > prof.txt
+	gprof test gmon.out > prof.txt
 gcov:run
 	gcov -b *.gcda
 	lcov -directory ./ --capture --output coverage.info
